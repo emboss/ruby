@@ -1,0 +1,264 @@
+=== 0.2.0 / 2011-05-08 [emboss]
+* Split C Template implementation into
+  separate files 
+
+=== 0.2.0 / 2011-05-08 [emboss]
+* Improved OpenSSL::ASN1.decode performance
+
+=== 0.2.0 / 2011-05-07 [emboss]
+* Further improved C Template parsing performance
+* Simplified ossl_asn1_decode0
+
+=== 0.2.0 / 2011-05-07 [emboss]
+* Further improved C Template parsing performance
+
+=== 0.2.0 / 2011-05-02 [emboss]
+* Further improved C Template parsing performance
+
+=== 0.2.0 / 2011-05-01 [emboss]
+* Improved C Template parsing performance
+
+=== 0.2.0 / 2011-04-30 [emboss]
+* Implemented C Template parsing
+except for infinite primitive values.
+
+=== 0.2.0 / 2011-04-28 [emboss]
+* Implemented constructive and primitive 
+  parser for C Template imlementation.
+
+=== 0.2.0 / 2011-04-28 [emboss]
+* Started Template implementation in C
+
+=== 0.2.0 / 2011-03-18 [emboss]
+* Added support for static/ephemeral 
+  scheme for PKey:DH
+
+=== 0.2.0 / 2011-03-08 [emboss]
+* Added KDF support for PKey::DH
+* Refactored KDF implementation
+
+  === 0.2.0 / 2011-02-28 [emboss]
+* Added more KDFs
+* moved KDF C implementations to
+  ossl_pkey.c (may be shared with DH)
+
+ === 0.2.0 / 2011-02-27 [emboss]
+* Started Ruby implementation of several
+  KDFs
+
+ === 0.2.0 / 2011-02-27 [emboss]
+* Fixed ECDH default KDF bug
+
+ === 0.2.0 / 2011-02-27 [emboss]
+* Started ECDH implementation
+
+ === 0.2.0 / 2011-02-23 [emboss]
+* Simplified Template definitions
+
+:setter hash key has been removed
+
+ === 0.2.0 / 2011-02-21 [emboss]
+* Corrected public key PEM encoding of DSA
+* Copy public key when dup'ing DH keys
+* Prioritized fallbacks for RSA key decoding
+  differently
+
+  === 0.2.0 / 2011-02-20 [emboss]
+* Corrected public key encoding of RSA
+* PEM encryption for EC keys
+* PKey instantiation from DER/PEM
+
+ === 0.2.0 / 2011-02-20 [emboss]
+* Adapted to changes for asn1_object_id
+
+ObjectId comparison is now handled by comparing 'oid',
+it's the only safe way to ensure equality.
+
+ === 0.2.0 / 2011-02-20 [emboss]
+* NullEncoder and NullParser
+* Optimization for parsed Any values
+* asn1_object_id: keep the ASN1 object to allow equality tests
+
+  === 0.2.0 / 2011-02-19 [emboss]
+* SignedData: support for verifying a SignerInfo
+
+ === 0.2.0 / 2011-02-19 [emboss]
+* Added convenience methods for SignedData and Certificate
+* Added DistinguishedName convenience methods
+* SignedData: support for signing a SignerInfo
+
+   === 0.2.0 / 2011-02-18 [emboss]
+* minor corrections
+
+=== 0.2.0 / 2011-02-17 [emboss]
+* Added classes for timestamp support.
+
+ === 0.2.0 / 2011-02-17 [emboss]
+* Replaced asn1_any by Any template class.
+=== 0.2.0 / 2011-02-16 [emboss]
+* SignedData parses and encodes correctly now.
+
+ === 0.2.0 / 2011-02-15 [emboss]
+* Added Crl and SignedData classes
+* Moved Template classes into OpenSSL::ASN1 namespace
+
+  === 0.2.0 / 2011-02-14 [emboss]
+* Minor performance improvements and refactoring
+
+ === 0.2.0 / 2011-02-13 [emboss]
+* Constructed min_size computed on class level.
+
+Prior to this, the minimum size for constructed types was 
+computed dynamically, now it is computed once when declaring
+the template type
+
+=== 0.2.0 / 2011-02-13 [emboss]
+* Added test
+* Performance improvements
+
+Got rid of the temporary objects that were used to parse 
+ConstructiveOfs and UTF8 strings.
+
+=== 0.2.0 / 2011-02-13 [emboss]
+* Performance improvements
+
+Splitting matching and unpacking the values on parsing brought 
+further gains in performance.
+
+ === 0.2.0 / 2011-02-12 [emboss]
+* Performance improvements
+
+Avoided having too many local variables that were drawn from the
+'options' hash. Biggest improvement was defaulting 'options' to
+nil instead of {}, what previously lead to lots of hash merges.
+
+=== 0.2.0 / 2011-02-12 [emboss]
+* Defaults are no longer encoded.
+
+ === 0.2.0 / 2011-02-12 [emboss]
+* Support for SET_OF and SEQUENCE_OF Templates
+
+ === 0.2.0 / 2011-02-12 [emboss]
+* Support for CHOICE Templates
+
+ === 0.2.0 / 2011-02-12 [emboss]
+* Encodings of instance variables is now available
+  for primitives
+
+It is now possible to get the encoding of each subelement of
+the entire Template, not only for Template types, but for
+primitives, too.
+
+ === 0.2.0 / 2011-02-11 [emboss]
+* Implemented infinite length parsing for primitives
+
+=== 0.2.0 / 2011-02-09 [emboss]
+* Implemented infinite length encoding for primitives
+
+ === 0.2.0 / 2011-02-09 [emboss]
+* Started infinite length support for primitives
+* Performance improvements
+
+=== 0.2.0 / 2011-02-08 [emboss]
+* Removed asn1_sequence/asn1_set
+
+Although a nice-to-have they introduce complexity
+and are not really needed. Each inner Sequence or 
+Set should be represented by another template. If
+an inner value should be accessible from the top
+level, this can be handled by method aliasing.
+
+=== 0.2.0 / 2011-02-06 [emboss]
+* Started infinite length support
+* Fixed bug within ASN.1 decoding
+
+=== 0.2.0 / 2011-02-02 [emboss]
+* Split Template in three separate files
+
+Base file is template.rb, which requires templates/encoder.rb
+and templates/parser.rb.
+
+=== 0.2.0 / 2011-02-02 [emboss]
+* Added further tests for Template
+* Fixed bug for non-matching templates
+
+=== 0.2.0 / 2011-02-01 [emboss]
+* Added further tests for Template
+* Fixed bug for check_size_cons on parsing 
+
+Treat default as optional when calculating the minimum length
+
+=== 0.2.0 / 2011-01-31 [emboss]
+* Added further tests for Template
+
+=== 0.2.0 / 2011-01-30 [emboss]
+* Added tests
+* Simplified ChoiceEncoder
+
+=== 0.2.0 / 2011-01-30 [emboss]
+* Bug fixes
+* Removed tag_class option
+* Added tests
+
+=== 0.2.0 / 2011-01-30 [emboss]
+* Support for asn1_choice with nested asn1_sequence and asn1_set
+
+=== 0.2.0 / 2011-01-30 [emboss]
+* Encoding to ASN.1 produces same output as decoding from DER.
+
+Before this change, to_asn1 encoded explicitly tagged values to
+ASN1 instances that had @tagging set to :EXPLICIT. This is inconsistent
+to what is created by ASN1.decode, where explicitly tagged values
+are wrapped as non-tagged values inside a ASN1Data that has the tag
+set. This caused an inconsistency when trying to parse a value that
+was encoded to ASN1, because the parsing routines expected the format
+of ASN1.decode. Now the encoder encodes also in this format.
+
+=== 0.2.0 / 2011-01-30 [emboss]
+* Template options that are passed on initialization are now only valid 
+for that instance.
+
+=== 0.2.0 / 2011-01-29 [emboss]
+* Added further tests for choices and fixed bugs.
+
+=== 0.2.0 / 2011-01-27 [emboss]
+* Adapted template to include fix for GetBNPtr(VALUE obj).
+
+Before the test for nil was "unless value || value != nil", now it is 
+"if value == nil"
+
+* Fixed bug for choice value matching.
+
+Previously tag was set in the definition, now it's correctly set in 
+options.
+
+* Added tests for choice declarations.
+
+* Added tests for primitives.
+
+* Added UTF8Parser to enforce UTF-8 encoding.
+
+Otherwise the test original == parsed would fail.
+
+=== 0.2.0 / 2011-01-27 [emboss]
+* Fixed bug in GetBNPtr(VALUE obj).
+
+Testing a BN for == nil or != nil raised a TypeError before.
+
+=== 0.2.0 / 2011-01-25 [emboss]
+* Fixed encoding of subclasses of Set and Sequence with infinite length
+
+=== 0.2.0 / 2011-01-25 [emboss]
+* Raise error for infinite length primitive values
+
+=== 0.2.0 / 2011-01-23 [emboss]
+* Improved handling of tag lookup for classes.
+
+The previous mechanism was walking through an array. Made constant time lookup
+by storing the information in a hash instead.
+
+=== 0.2.0 / 2011-01-22 [emboss]
+* added OpenSSL::ASN1::Template
+
+=== 0.1.0 / 2011-01-10 [emboss]
+* Birth
