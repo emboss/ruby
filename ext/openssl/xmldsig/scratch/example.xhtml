@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="de">
+    <head>
+        <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8" />
+        <title>Example for DOM and XHTML</title>
+        <meta                 name="Copyright" content="Â© 2003 ITCQIS GmbH. All rights reserved." />
+        <meta                 name="License"   content="LGPL" />
+        <meta                 name="Author"    content="ITCQIS GmbH, Christian Hujer" />
+        <link rel="TOC" href="#toc" />
+
+        <style type="text/css">
+            #rect {
+                position:fixed;
+                left:0px;
+                top:0px;
+                background-color:#fea;
+            }
+        </style>
+        <script type="text/javascript">
+            <![CDATA[
+                xmlns="http://www.w3.org/1999/xhtml";
+                x = 0;
+                step = 5;
+                function mousehandler() {
+                    var rect = document.getElementById("rect");
+                    rect.style.setProperty("left", (x += step) +"px", "");
+                    if ((x >= window.innerWidth - rect.clientWidth) || (x <= 0)) {
+                        step = -step;
+                    }
+                }
+                function generateTOC() {
+                    window.alert("bla");
+                    head = document.getElementsByTagName("head").item(0);
+                    tocUl = document.createElementNS(xmlns, "ul");
+                    nodes = document.getElementsByTagName("h2");
+                    for (i = 0; i < nodes.length; i++) {
+                        currentH1 = nodes.item(i);
+                        li = document.createElementNS(xmlns, "li");
+                        currentH1Node = currentH1.childNodes;
+                        a = document.createElementNS(xmlns, "a");
+                        link = document.createElementNS(xmlns, "link");
+                        link.setAttribute("href", "#heading" + i);
+                        link.setAttribute("rel", "Chapter");
+                        a.setAttribute("href", "#heading" + i);
+                        linktitle="";
+                        for (j = 0; j < currentH1Node.length; j++) {
+                            currentH1NodeChild = currentH1Node.item(j);
+                            a.appendChild(currentH1NodeChild.cloneNode(true));
+                            if (currentH1NodeChild.nodeType == Node.TEXT_NODE) {
+                                linktitle += currentH1NodeChild.nodeValue;
+                            }
+                        }
+                        link.setAttribute("title", linktitle);
+                        li.appendChild(a);
+                        head.appendChild(link);
+                        tocUl.appendChild(li);
+                        a = document.createElementNS(xmlns, "a");
+                        a.setAttribute("id", "heading" + i);
+                        a.setAttribute("name", "heading" + i);
+                        currentH1.parentNode.insertBefore(a, currentH1);
+                        /** Example of how to modify the inline style of an element */
+                        currentH1.style.setProperty("background-color", "#ddd", "");
+                    }
+                    document.getElementById("toc").appendChild(tocUl);
+                }
+            ]]>
+        </script>
+    </head>
+    <body onload="generateTOC();" onmousemove="mousehandler();">
+        <div id="rect"><h1>RECT</h1></div>
+
+        <h1>Example for DOM and XHTML</h1>
+        <h2>Table of Contents</h2>
+        <div id="toc"/>
+        <h2>Chapter 1</h2>
+        <p>
+            This is an example of using XHTML, DOM and ECMAScript.
+        </p>
+        <h2>Chapter 2</h2>
+
+        <p>
+            This example uses an automatically generated table of contents.
+        </p>
+        <h2>Chapter 3</h2>
+        <p>
+            This example does not work in Konqueror because Konqueror does not recognize the <code>&lt;body onload=""</code>-attribute
+            from the intrinsic events module of XHTML Modularization / XHTML 1.1.
+        </p>
+    </body>
+
+</html>
+
+
