@@ -89,10 +89,17 @@ end
 # * <tt> #determinant                   </tt>
 # * <tt> #det                           </tt>
 # * <tt> #rank                          </tt>
+# * <tt> #round                         </tt>
 # * <tt> #trace                         </tt>
 # * <tt> #tr                            </tt>
 # * <tt> #transpose                     </tt>
 # * <tt> #t                             </tt>
+#
+# Matrix decompositions:
+# * <tt> #eigen                         </tt>
+# * <tt> #eigensystem                   </tt>
+# * <tt> #lup                           </tt>
+# * <tt> #lup_decomposition             </tt>
 #
 # Complex arithmetic:
 # * <tt> conj                           </tt>
@@ -116,6 +123,8 @@ end
 class Matrix
   include Enumerable
   include ExceptionForMatrix
+  autoload :EigenvalueDecomposition, "matrix/eigenvalue_decomposition"
+  autoload :LUPDecomposition, "matrix/lup_decomposition"
 
   # instance creations
   private_class_method :new
@@ -950,8 +959,10 @@ class Matrix
   private :inverse_from
 
   #
-  # Matrix exponentiation.  Currently implemented for integer powers only.
+  # Matrix exponentiation.
   # Equivalent to multiplying the matrix by itself N times.
+  # Non integer exponents will be handled by diagonalizing the matrix.
+  #
   #   Matrix[[7,6], [3,9]] ** 2
   #     => 67 96
   #        48 99
@@ -971,8 +982,9 @@ class Matrix
         return z if (other >>= 1).zero?
         x *= x
       end
-    when Float, Rational
-      Matrix.Raise ErrOperationNotImplemented, "**", self.class, other.class
+    when Numeric
+      v, d, v_inv = eigensystem
+      v * Matrix.diagonal(*d.each(:diagonal).map{|e| e ** other}) * v_inv
     else
       Matrix.Raise ErrOperationNotDefined, "**", self.class, other.class
     end
@@ -1125,6 +1137,12 @@ class Matrix
     rank
   end
 
+  # Returns a matrix with entries rounded to the given precision
+  # (see Float#round)
+  #
+  def round(ndigits=0)
+    map{|e| e.round(ndigits)}
+  end
 
   #
   # Returns the trace (sum of diagonal elements) of the matrix.
@@ -1154,6 +1172,38 @@ class Matrix
     new_matrix @rows.transpose, row_size
   end
   alias t transpose
+
+  #--
+  # DECOMPOSITIONS -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  #++
+
+  #
+  # Returns the Eigensystem of the matrix; see +EigenvalueDecomposition+.
+  #   m = Matrix[[1, 2], [3, 4]]
+  #   v, d, v_inv = m.eigensystem
+  #   d.diagonal? # => true
+  #   v.inv == v_inv # => true
+  #   (v * d * v_inv).round(5) == m # => true
+  #
+  def eigensystem
+    EigenvalueDecomposition.new(self)
+  end
+  alias eigen eigensystem
+
+  #
+  # Returns the LUP decomposition of the matrix; see +LUPDecomposition+.
+  #   a = Matrix[[1, 2], [3, 4]]
+  #   l, u, p = a.lup
+  #   l.lower_triangular? # => true
+  #   u.upper_triangular? # => true
+  #   p.permutation?      # => true
+  #   l * u == a * p      # => true
+  #   a.lup.solve([2, 5]) # => Vector[(1/1), (1/2)]
+  #
+  def lup
+    LUPDecomposition.new(self)
+  end
+  alias lup_decomposition lup
 
   #--
   # COMPLEX ARITHMETIC -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=

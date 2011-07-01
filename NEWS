@@ -63,7 +63,7 @@ with all sufficient information, see the ChangeLog file.
         Write `string` to file `name`.
         Opposite with File.read.
       * IO.binwrite(name, string, [offset] )
-        binary virsion of IO.write.
+        binary version of IO.write.
 
   * Kernel
     * Kernel#respond_to? now returns false for protected methods.
@@ -157,13 +157,21 @@ with all sufficient information, see the ChangeLog file.
     * IO.console
 
 * matrix
+  * new classes:
+    * Matrix::EigenvalueDecomposition
+    * Matrix::LUPDecomposition
   * new methods:
     * Matrix#diagonal?
+    * Matrix#eigen
+    * Matrix#eigensystem
     * Matrix#hermitian?
     * Matrix#lower_triangular?
+    * Matrix#lup
+    * Matrix#lup_decomposition
     * Matrix#normal?
     * Matrix#orthogonal?
     * Matrix#permutation?
+    * Matrix#round
     * Matrix#symmetric?
     * Matrix#unitary?
     * Matrix#upper_triangular?
@@ -173,6 +181,7 @@ with all sufficient information, see the ChangeLog file.
     * Matrix#each and #each_with_index can iterate on a subset of the elements
     * Matrix#find_index returns [row, column] and can iterate on a subset
       of the elements
+    * Matrix#** implements Numeric exponents (using the eigensystem)
     * Matrix.zero can build rectangular matrices
 
 * net/http
