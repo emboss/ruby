@@ -24,6 +24,9 @@ Makefile
 extconf.h
 y.output
 y.tab.c
+build/
+dist/
+private/
 
 # /
 /*.pc
