@@ -2,7 +2,7 @@
 CC = gcc
 CFLAGS = -Wall
 INCFLAGS = -I. -I/usr/include -I/usr/include/libxml2
-LIBS = -ldl -lxml2
+LIBS = -ldl -lxml2 -lcrypto
 
 all: main.o 
 	$(CC) $(LIBS) -o test main.o 
@@ -11,4 +11,4 @@ main.o: main.c
 	$(CC) -c $(CFLAGS) $(INCFLAGS) main.c
 
 clean:
-	m test main.o
+	rm test main.o

@@ -5,11 +5,22 @@
 
 #include <libxml/tree.h>
 #include <libxml/parser.h>
+#include <libxml/c14n.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/buffer.h>
+
 int  execute_xpath_expression(void);
 void create_signature(void);
+void create_signature_nodes(xmlDocPtr doc, xmlChar *digested_doc);
+xmlNodePtr create_signed_info(xmlNodePtr signature, xmlNsPtr ns_dsig, xmlChar *digested_doc);
+xmlChar *digest_document(xmlDocPtr doc);
+xmlChar *base64(const xmlChar *input, int length);
+int digest(xmlChar *input, int len, xmlChar **out);
 int  register_namespaces(xmlXPathContextPtr xpathCtx, const xmlChar* nsList);
 void print_xpath_nodes(xmlNodeSetPtr nodes, FILE* output);
 
@@ -19,39 +30,30 @@ main(int argc, char **argv) {
     xmlInitParser();
     LIBXML_TEST_VERSION
 
-    execute_xpath_expression();
+    /* execute_xpath_expression(); */
     create_signature();
 
     /* Shutdown libxml */
     xmlCleanupParser();
 
-    /*
-     * this is to debug memory for regression tests
-     */
-    xmlMemoryDump();
     return 0;
 }
 
 void create_signature(void)
 {
     xmlDocPtr doc;
-    xmlNodePtr root, signature, signed_info;
-    xmlNsPtr ns_dsig;
+    xmlChar *digested_doc;
     FILE *out;
-
-    const unsigned char *s_dsig_ns = "http://www.w3.org/2000/09/xmldsig#";
-
+    
     doc = xmlParseFile("example.xhtml");
     if (doc == NULL) {
 	fprintf(stderr, "Error: unable to parse file example.xhtml\n");
 	return;
     }
 
-    root = xmlDocGetRootElement(doc);
-    ns_dsig = xmlNewNs(root, s_dsig_ns, "dsig");
-    signature = xmlNewChild(root, ns_dsig, "Signature", NULL);
-    signed_info = xmlNewChild(signature, ns_dsig, "SignedInfo", NULL);
-
+    digested_doc = digest_document(doc);
+    create_signature_nodes(doc, digested_doc);
+    
     if (!(out = fopen("out.xml", "wb"))) {
         fprintf(stderr, "Error: unable to open out.xml for output\n");
 	return;
@@ -62,7 +64,118 @@ void create_signature(void)
 	return;
     }
 
+    xmlFree(digested_doc);
+    xmlFreeDoc(doc);
     fclose(out);
+}
+
+void
+create_signature_nodes(xmlDocPtr doc, xmlChar *digested_doc) {
+    xmlNodePtr root, signature, signed_info;
+    xmlNsPtr ns_dsig;
+    xmlNodeSetPtr ns;
+    xmlChar *canon, *digest_val, *b64;
+    int len;
+    const xmlChar *s_dsig_ns = BAD_CAST "http://www.w3.org/2000/09/xmldsig#";
+    
+    root = xmlDocGetRootElement(doc);
+    ns_dsig = xmlNewNs(root, s_dsig_ns, BAD_CAST "dsig");
+    signature = xmlNewChild(root, ns_dsig, BAD_CAST "Signature", NULL);
+    signed_info = create_signed_info(signature, ns_dsig, digested_doc);
+    ns = xmlXPathNodeSetCreate(signed_info);
+    len = xmlC14NDocDumpMemory(doc, ns, 0, NULL, 0, &canon);
+    len = digest(canon, len, &digest_val);
+    /* TODO: Sign the digest */
+    b64 = base64(digest_val, len);
+    xmlFree(canon);
+    xmlFree(digest_val);
+    xmlNewChild(signature, ns_dsig, BAD_CAST "SignatureValue", b64);
+}
+
+xmlNodePtr
+create_signed_info(xmlNodePtr signature, xmlNsPtr ns_dsig, xmlChar *digested_doc) {
+    xmlNodePtr signed_info, can_method, 
+               sig_method, reference, transforms, transform,
+               dig_method;
+    signed_info = xmlNewChild(signature, ns_dsig, BAD_CAST "SignedInfo", NULL);
+    can_method = xmlNewChild(signed_info, ns_dsig, BAD_CAST "CanonicalizationMethod", NULL);
+    xmlNewProp(can_method, BAD_CAST "Algorithm", BAD_CAST "http://www.w3.org/TR/2001/REC-xml-c14n-20010315");
+    sig_method = xmlNewChild(signed_info, ns_dsig, BAD_CAST "SignatureMethod", NULL);
+    xmlNewProp(sig_method, BAD_CAST "Algorithm", BAD_CAST "http://www.w3.org/2000/09/xmldsig#rsa-sha1");
+    reference = xmlNewChild(signed_info, ns_dsig, BAD_CAST "Reference", NULL);
+    xmlNewProp(reference, BAD_CAST "URI", BAD_CAST "");
+    transforms = xmlNewChild(reference, ns_dsig, BAD_CAST "Transforms", NULL);
+    transform = xmlNewChild(transforms, ns_dsig, BAD_CAST "Transform", NULL);
+    xmlNewProp(transform, BAD_CAST "Algorithm", BAD_CAST "http://www.w3.org/2000/09/xmldsig#enveloped-signature");
+    dig_method = xmlNewChild(reference, ns_dsig, BAD_CAST "DigestMethod", NULL);
+    xmlNewProp(dig_method, BAD_CAST "Algorithm", BAD_CAST "http://www.w3.org/2000/09/xmldsig#sha1");
+    xmlNewChild(reference, ns_dsig, BAD_CAST "DigestValue", digested_doc);
+    return signed_info;
+}
+
+xmlChar *
+digest_document(xmlDocPtr doc) {
+    xmlXPathContextPtr xpathCtx;
+    xmlXPathObjectPtr xpathObj;
+    xmlChar *canon, *digest_val, *b64;
+    int len;
+    const xmlChar *xpathExpr = BAD_CAST "(//. | //@* | //namespace::*)";
+    
+    if (!(xpathCtx = xmlXPathNewContext(doc))) {
+        fprintf(stderr,"Error: unable to create new XPath context\n");
+        xmlFreeDoc(doc);
+    }
+    
+    if (!(xpathObj = xmlXPathEvalExpression(xpathExpr, xpathCtx))) {
+        fprintf(stderr,"Error: unable to evaluate xpath expression \"%s\"\n", xpathExpr);
+        xmlXPathFreeContext(xpathCtx);
+        xmlFreeDoc(doc);
+    }
+
+    len = xmlC14NDocDumpMemory(doc, xpathObj->nodesetval, 0, NULL, 0, &canon);
+    len = digest(canon, len, &digest_val);
+    b64 = base64(digest_val, len);
+    xmlFree(canon);
+    xmlFree(digest_val);
+    return b64;
+}
+
+int 
+digest(xmlChar *input, int len, xmlChar **out) {
+    EVP_MD_CTX *ctx;
+    xmlChar md[SHA_DIGEST_LENGTH];
+ 
+    if (!(ctx = EVP_MD_CTX_create())) {
+        return(-1);
+    }
+    
+    EVP_DigestInit(ctx, EVP_sha1());
+    EVP_DigestUpdate(ctx, input, len);
+    EVP_DigestFinal(ctx, md, NULL);
+    
+    *out = base64(md, SHA_DIGEST_LENGTH);
+    return SHA_DIGEST_LENGTH;
+}
+
+xmlChar *base64(const xmlChar *input, int length)
+{
+  BIO *bmem, *b64;
+  BUF_MEM *bptr;
+
+  b64 = BIO_new(BIO_f_base64());
+  bmem = BIO_new(BIO_s_mem());
+  b64 = BIO_push(b64, bmem);
+  BIO_write(b64, input, length);
+  BIO_flush(b64);
+  BIO_get_mem_ptr(b64, &bptr);
+
+  xmlChar *buff = (xmlChar *)malloc(bptr->length);
+  memcpy(buff, bptr->data, bptr->length-1);
+  buff[bptr->length-1] = 0;
+
+  BIO_free_all(b64);
+
+  return buff;
 }
 
 int
@@ -70,7 +183,7 @@ execute_xpath_expression(void) {
     xmlDocPtr doc;
     xmlXPathContextPtr xpathCtx;
     xmlXPathObjectPtr xpathObj;
-    const xmlChar *xpathExpr = "//xhtml:div";
+    const xmlChar *xpathExpr = BAD_CAST "//xhtml:div";
     
     /* Load XML document */
     doc = xmlParseFile("example.xhtml");
@@ -87,7 +200,7 @@ execute_xpath_expression(void) {
         return(-1);
     }
 
-    if (xmlXPathRegisterNs (xpathCtx, (xmlChar*)"xhtml", (xmlChar*)"http://www.w3.org/1999/xhtml") < 0) {
+    if (xmlXPathRegisterNs (xpathCtx, BAD_CAST "xhtml", BAD_CAST "http://www.w3.org/1999/xhtml") < 0) {
         fprintf(stderr,"Error: failed to register namespace\n");
         xmlXPathFreeContext(xpathCtx);
         xmlFreeDoc(doc);
