@@ -111,6 +111,9 @@ private/
 /ext/iconv/config.charset
 /ext/iconv/iconv.rb
 
+#
+/ext/openssl/xmldsig/scratch/out.xml
+
 # /ext/ripper/
 /ext/ripper/eventids1.c
 /ext/ripper/eventids2table.c

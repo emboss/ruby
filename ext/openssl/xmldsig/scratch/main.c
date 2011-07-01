@@ -8,7 +8,8 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 
-int  execute_xpath_expression();
+int  execute_xpath_expression(void);
+void create_signature(void);
 int  register_namespaces(xmlXPathContextPtr xpathCtx, const xmlChar* nsList);
 void print_xpath_nodes(xmlNodeSetPtr nodes, FILE* output);
 
@@ -19,6 +20,7 @@ main(int argc, char **argv) {
     LIBXML_TEST_VERSION
 
     execute_xpath_expression();
+    create_signature();
 
     /* Shutdown libxml */
     xmlCleanupParser();
@@ -30,8 +32,41 @@ main(int argc, char **argv) {
     return 0;
 }
 
+void create_signature(void)
+{
+    xmlDocPtr doc;
+    xmlNodePtr root, signature, signed_info;
+    xmlNsPtr ns_dsig;
+    FILE *out;
+
+    const unsigned char *s_dsig_ns = "http://www.w3.org/2000/09/xmldsig#";
+
+    doc = xmlParseFile("example.xhtml");
+    if (doc == NULL) {
+	fprintf(stderr, "Error: unable to parse file example.xhtml\n");
+	return;
+    }
+
+    root = xmlDocGetRootElement(doc);
+    ns_dsig = xmlNewNs(root, s_dsig_ns, "dsig");
+    signature = xmlNewChild(root, ns_dsig, "Signature", NULL);
+    signed_info = xmlNewChild(signature, ns_dsig, "SignedInfo", NULL);
+
+    if (!(out = fopen("out.xml", "wb"))) {
+        fprintf(stderr, "Error: unable to open out.xml for output\n");
+	return;
+    }
+
+    if (xmlDocDump(out, doc) < 0) {
+        fprintf(stderr, "Error: Could not write document\n");
+	return;
+    }
+
+    fclose(out);
+}
+
 int
-execute_xpath_expression() {
+execute_xpath_expression(void) {
     xmlDocPtr doc;
     xmlXPathContextPtr xpathCtx;
     xmlXPathObjectPtr xpathObj;
