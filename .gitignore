@@ -112,7 +112,8 @@ private/
 /ext/iconv/iconv.rb
 
 #
-/ext/openssl/xmldsig/scratch/out.xml
+/ext/openssl/scratch/out.xml
+/ext/openssl/scratch/test
 
 # /ext/ripper/
 /ext/ripper/eventids1.c
