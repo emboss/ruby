@@ -20,17 +20,26 @@ VALUE mXMLDSIG;
  */
 VALUE eXMLDSIGError;
 
-static void
-xmldsig_finalize(VALUE dummy)
+VALUE
+xml_dsig_get_encoding(xmlDocPtr doc)
 {
-    xmlCleanupParser();
+    const char *encoding;
+    rb_encoding *rb_enc;
+
+    if (!doc->encoding) 
+	encoding = "UTF-8";
+    else
+	encoding = (const char *)doc->encoding;
+
+    if ((rb_enc = rb_enc_find(encoding)) == 0) 
+	rb_raise(eXMLDSIGError, "Could not load encoding %s", encoding);
+    return rb_enc_from_encoding(rb_enc);
 }
 
 void
 Init_xmldsig(void)
 {
-    /* Init libxml */
-    xmlInitParser();
+    /* sanity check */
     LIBXML_TEST_VERSION
 
     mXMLDSIG = rb_define_module("XmlDsig");
@@ -46,7 +55,5 @@ Init_xmldsig(void)
      */
     Init_xmldsig_document();
     Init_xmldsig_signature();
-
-    rb_set_end_proc(xmldsig_finalize, Qnil);
 }
 

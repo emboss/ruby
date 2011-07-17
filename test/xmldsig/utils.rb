@@ -1,10 +1,10 @@
 # encoding: UTF-8
-require 'openssl'
+require 'test/unit'
+require 'xmldsig'
 
 module XmlDsig::TestUtils
   
-  TEST_DOC_UTF_8 = <<-_EOS_
-<?xml version="1.0" encoding="UTF-8">
+  TEST_CONTENT = <<-_EOS_
 <!DOCTYPE html 
   PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
@@ -16,15 +16,17 @@ module XmlDsig::TestUtils
   </head>
   <body>
     <p>
-      Text:öäüßÖÄÜ€
+      Text
     </p>
   </body>
 </html>
 _EOS_
 
-  TEST_DOC_ISO_8859_1 = TEST_DOC_UTF8.encode("ISO-8859-1")
+  TEST_DOC_UTF_8 = '<?xml version="1.0" encoding="UTF-8"?>' + TEST_CONTENT
+
+  TEST_DOC_ISO_8859_1 = '<?xml version="1.0" encoding="iso-8859-1"?>' + TEST_CONTENT.encode("ISO-8859-1")
  
-  TEST_DOC_US_ASCII = ascii_doc
+  TEST_DOC_US_ASCII = '<?xml version="1.0" encoding="us-ascii"?>' + TEST_CONTENT.encode("US-ASCII")
 
   TEST_KEY_RSA1024 = OpenSSL::PKey::RSA.new <<-_end_of_pem_
 -----BEGIN RSA PRIVATE KEY-----
@@ -74,9 +76,7 @@ gBoDG3WMPZoQj9pb7uMcrnvs4APj2FIhMU8U15LcPAj59cD6S6rWnAxO8NFK7HQG
 -----END RSA PRIVATE KEY-----
   _end_of_pem_
 
-  module_function
-
-  def issue_cert(dn, key, serial, not_before, not_after, extensions,
+  def self.issue_cert(dn, key, serial, not_before, not_after, extensions,
                  issuer, issuer_key, digest)
     cert = OpenSSL::X509::Certificate.new
     issuer = cert unless issuer
@@ -125,29 +125,5 @@ gBoDG3WMPZoQj9pb7uMcrnvs4APj2FIhMU8U15LcPAj59cD6S6rWnAxO8NFK7HQG
     end
 
   end
-
-  private
-
-  def ascii_doc
-    doc = <<-_EOS_
-<?xml version="1.0" encoding="US-ASCII">
-<!DOCTYPE html 
-  PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-  <head>
-    <title>
-      XML Signatures
-    </title>
-  </head>
-  <body>
-    <p>
-      Text
-    </p>
-  </body>
-</html>
-_EOS_
-    doc.encode("US-ASCII")
-  end
-
+  
 end

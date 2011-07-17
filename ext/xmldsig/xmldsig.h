@@ -72,6 +72,8 @@ extern VALUE eXMLDSIGError;
 #include "xmldsig_document.h"
 #include "xmldsig_signature.h"
 
+VALUE xml_dsig_get_encoding(xmlDocPtr doc);
+
 void Init_xmldsig(void);
 
 #if defined(__cplusplus)
