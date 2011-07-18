@@ -980,10 +980,6 @@ static int forked_child = 0;
 static RETSIGTYPE (*saved_sigpipe_handler)(int) = 0;
 #endif
 
-#if defined(POSIX_SIGNAL)
-# define signal(a,b) posix_signal((a),(b))
-#endif
-
 #ifdef SIGPIPE
 static RETSIGTYPE sig_do_nothing(int sig)
 {
@@ -992,12 +988,6 @@ static RETSIGTYPE sig_do_nothing(int sig)
 
 static void before_exec(void)
 {
-    /*
-     * signalmask is inherited across exec() and almost system commands don't
-     * work if signalmask is blocked.
-     */
-    rb_enable_interrupt();
-
 #ifdef SIGPIPE
     /*
      * Some OS commands don't initialize signal handler properly. Thus we have
@@ -1010,9 +1000,9 @@ static void before_exec(void)
 
     if (!forked_child) {
 	/*
-	 * On old MacOS X, exec() may return ENOTSUPP if the process have
-	 * multiple threads. Therefore we have to kill internal threads at once.
-	 * [ruby-core: 10583]
+	 * On Mac OS X 10.5.x (Leopard) or earlier, exec() may return ENOTSUPP
+	 * if the process have multiple threads. Therefore we have to kill
+	 * internal threads temporary. [ruby-core: 10583]
 	 */
 	rb_thread_stop_timer_thread(0);
     }
@@ -1028,7 +1018,6 @@ static void after_exec(void)
 #endif
 
     forked_child = 0;
-    rb_disable_interrupt();
 }
 
 #define before_fork() before_exec()
@@ -1475,7 +1464,7 @@ rb_exec_arg_addopt(struct rb_exec_arg *e, VALUE key, VALUE val)
 {
     VALUE options = e->options;
     ID id;
-#ifdef RLIM2NUM
+#if defined(HAVE_SETRLIMIT) && defined(NUM2RLIM)
     int rtype;
 #endif
 
@@ -2947,43 +2936,9 @@ rb_f_abort(int argc, VALUE *argv)
 void
 rb_syswait(rb_pid_t pid)
 {
-    static int overriding;
-#ifdef SIGHUP
-    RETSIGTYPE (*hfunc)(int) = 0;
-#endif
-#ifdef SIGQUIT
-    RETSIGTYPE (*qfunc)(int) = 0;
-#endif
-    RETSIGTYPE (*ifunc)(int) = 0;
     int status;
-    int i, hooked = FALSE;
 
-    if (!overriding) {
-#ifdef SIGHUP
-	hfunc = signal(SIGHUP, SIG_IGN);
-#endif
-#ifdef SIGQUIT
-	qfunc = signal(SIGQUIT, SIG_IGN);
-#endif
-	ifunc = signal(SIGINT, SIG_IGN);
-	overriding = TRUE;
-	hooked = TRUE;
-    }
-
-    do {
-	i = rb_waitpid(pid, &status, 0);
-    } while (i == -1 && errno == EINTR);
-
-    if (hooked) {
-#ifdef SIGHUP
-	signal(SIGHUP, hfunc);
-#endif
-#ifdef SIGQUIT
-	signal(SIGQUIT, qfunc);
-#endif
-	signal(SIGINT, ifunc);
-	overriding = FALSE;
-    }
+    rb_waitpid(pid, &status, 0);
 }
 
 static VALUE

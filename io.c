@@ -188,7 +188,7 @@ static int max_file_descriptor = NOFILE;
 
 #if defined(_WIN32)
 #define WAIT_FD_IN_WIN32(fptr) \
-    (rb_w32_has_cancel_io() ? 0 : rb_thread_wait_fd((fptr)->fd))
+    (rb_w32_io_cancelable_p((fptr)->fd) ? 0 : rb_thread_wait_fd((fptr)->fd))
 #else
 #define WAIT_FD_IN_WIN32(fptr)
 #endif
@@ -2633,12 +2633,15 @@ rb_io_gets_m(int argc, VALUE *argv, VALUE io)
  *  call-seq:
  *     ios.lineno    -> integer
  *
- *  Returns the current line number in <em>ios</em>. The stream must be
+ *  Returns the current line number in <em>ios</em>.  The stream must be
  *  opened for reading. <code>lineno</code> counts the number of times
- *  <code>gets</code> is called, rather than the number of newlines
- *  encountered. The two values will differ if <code>gets</code> is
- *  called with a separator other than newline. See also the
- *  <code>$.</code> variable.
+ *  #gets is called rather than the number of newlines encountered.  The two
+ *  values will differ if #gets is called with a separator other than newline.
+ *
+ *  Methods that use <code>$/</code> like #each, #lines and #readline will
+ *  also increment <code>lineno</code>.
+ *
+ *  See also the <code>$.</code> variable.
  *
  *     f = File.new("testfile")
  *     f.lineno   #=> 0
@@ -3621,6 +3624,12 @@ rb_io_close(VALUE io)
     if (fptr->fd < 0) return Qnil;
 
     fd = fptr->fd;
+#if defined __APPLE__ && defined(__MACH__) && \
+    (!defined(MAC_OS_X_VERSION_MIN_ALLOWED) || MAC_OS_X_VERSION_MIN_ALLOWED <= 1050)
+    /* close(2) on a fd which is being read by another thread causes
+     * deadlock on Mac OS X 10.5 */
+    rb_thread_fd_close(fd);
+#endif
     rb_io_fptr_cleanup(fptr, FALSE);
     rb_thread_fd_close(fd);
 
@@ -6517,6 +6526,9 @@ rb_io_initialize(int argc, VALUE *argv, VALUE io)
     rb_io_extract_modeenc(&vmode, 0, opt, &oflags, &fmode, &convconfig);
 
     fd = NUM2INT(fnum);
+    if (rb_reserved_fd_p(fd)) {
+	rb_raise(rb_eArgError, "The given fd is not accessible because RubyVM reserves it");
+    }
 #if defined(HAVE_FCNTL) && defined(F_GETFL)
     oflags = fcntl(fd, F_GETFL);
     if (oflags == -1) rb_sys_fail(0);

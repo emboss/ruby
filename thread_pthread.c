@@ -148,6 +148,9 @@ gvl_init(rb_vm_t *vm)
 static void
 gvl_destroy(rb_vm_t *vm)
 {
+    native_cond_destroy(&vm->gvl.switch_wait_cond);
+    native_cond_destroy(&vm->gvl.switch_cond);
+    native_cond_destroy(&vm->gvl.cond);
     native_mutex_destroy(&vm->gvl.lock);
 }
 
@@ -167,9 +170,9 @@ mutex_debug(const char *msg, pthread_mutex_t *lock)
 	int r;
 	static pthread_mutex_t dbglock = PTHREAD_MUTEX_INITIALIZER;
 
-	if ((r = pthread_mutex_lock(&dbglock)) != 0) {exit(1);}
+	if ((r = pthread_mutex_lock(&dbglock)) != 0) {exit(EXIT_FAILURE);}
 	fprintf(stdout, "%s: %p\n", msg, (void *)lock);
-	if ((r = pthread_mutex_unlock(&dbglock)) != 0) {exit(1);}
+	if ((r = pthread_mutex_unlock(&dbglock)) != 0) {exit(EXIT_FAILURE);}
     }
 }
 
@@ -453,51 +456,59 @@ static rb_thread_t *register_cached_thread_and_wait(void);
 #endif
 
 #ifdef STACKADDR_AVAILABLE
+/*
+ * Get the initial address and size of current thread's stack
+ */
 static int
 get_stack(void **addr, size_t *size)
 {
 #define CHECK_ERR(expr)				\
     {int err = (expr); if (err) return err;}
-#if defined HAVE_PTHREAD_GETATTR_NP || defined HAVE_PTHREAD_ATTR_GET_NP
+#if defined HAVE_PTHREAD_GETATTR_NP || defined HAVE_PTHREAD_ATTR_GET_NP || \
+    (defined HAVE_PTHREAD_GET_STACKADDR_NP && defined HAVE_PTHREAD_GET_STACKSIZE_NP)
     pthread_attr_t attr;
     size_t guard = 0;
 
-# ifdef HAVE_PTHREAD_GETATTR_NP
+# ifdef HAVE_PTHREAD_GETATTR_NP /* Linux */
+    STACK_GROW_DIR_DETECTION;
     CHECK_ERR(pthread_getattr_np(pthread_self(), &attr));
 #   ifdef HAVE_PTHREAD_ATTR_GETSTACK
     CHECK_ERR(pthread_attr_getstack(&attr, addr, size));
+    STACK_DIR_UPPER((void)0, (void)(*addr = (char *)*addr + *size));
 #   else
     CHECK_ERR(pthread_attr_getstackaddr(&attr, addr));
     CHECK_ERR(pthread_attr_getstacksize(&attr, size));
 #   endif
-    if (pthread_attr_getguardsize(&attr, &guard) == 0) {
-	STACK_GROW_DIR_DETECTION;
-	STACK_DIR_UPPER((void)0, (void)(*addr = (char *)*addr + guard));
-	*size -= guard;
-    }
-# else
+# elif defined HAVE_PTHREAD_ATTR_GET_NP /* FreeBSD, DragonFly BSD, NetBSD */
     CHECK_ERR(pthread_attr_init(&attr));
     CHECK_ERR(pthread_attr_get_np(pthread_self(), &attr));
+#   ifdef HAVE_PTHREAD_ATTR_GETSTACK
+    CHECK_ERR(pthread_attr_getstack(&attr, addr, size));
+    STACK_DIR_UPPER((void)0, (void)(*addr = (char *)*addr + *size));
+#   else
     CHECK_ERR(pthread_attr_getstackaddr(&attr, addr));
     CHECK_ERR(pthread_attr_getstacksize(&attr, size));
+    STACK_DIR_UPPER((void)0, (void)(*addr = (char *)*addr + *size));
+#   endif
+# else /* MacOS X */
+    pthread_t th = pthread_self();
+    *addr = pthread_get_stackaddr_np(th);
+    *size = pthread_get_stacksize_np(th);
+    CHECK_ERR(pthread_attr_init(&attr));
 # endif
     CHECK_ERR(pthread_attr_getguardsize(&attr, &guard));
     *size -= guard;
     pthread_attr_destroy(&attr);
-#elif defined HAVE_PTHREAD_GET_STACKADDR_NP && defined HAVE_PTHREAD_GET_STACKSIZE_NP
-    pthread_t th = pthread_self();
-    *addr = pthread_get_stackaddr_np(th);
-    *size = pthread_get_stacksize_np(th);
 #elif defined HAVE_THR_STKSEGMENT || defined HAVE_PTHREAD_STACKSEG_NP
     stack_t stk;
-# if defined HAVE_THR_STKSEGMENT
+# if defined HAVE_THR_STKSEGMENT /* Solaris */
     CHECK_ERR(thr_stksegment(&stk));
-# else
+# else /* OpenBSD */
     CHECK_ERR(pthread_stackseg_np(pthread_self(), &stk));
 # endif
     *addr = stk.ss_sp;
     *size = stk.ss_size;
-#elif defined HAVE_PTHREAD_GETTHRDS_NP
+#elif defined HAVE_PTHREAD_GETTHRDS_NP /* AIX */
     pthread_t th = pthread_self();
     struct __pthrdsinfo thinfo;
     char reg[256];
@@ -507,6 +518,9 @@ get_stack(void **addr, size_t *size)
 				   &reg, &regsiz));
     *addr = thinfo.__pi_stackaddr;
     *size = thinfo.__pi_stacksize;
+    STACK_DIR_UPPER((void)0, (void)(*addr = (char *)*addr + *size));
+#else
+#error STACKADDR_AVAILABLE is defined but not implemented.
 #endif
     return 0;
 #undef CHECK_ERR
@@ -601,6 +615,10 @@ native_thread_init_stack(rb_thread_t *th)
     return 0;
 }
 
+#ifndef __CYGWIN__
+#define USE_NATIVE_THREAD_INIT 1
+#endif
+
 static void *
 thread_start_func_1(void *th_ptr)
 {
@@ -609,14 +627,20 @@ thread_start_func_1(void *th_ptr)
 #endif
     {
 	rb_thread_t *th = th_ptr;
+#if !defined USE_NATIVE_THREAD_INIT
 	VALUE stack_start;
+#endif
 
-#ifndef __CYGWIN__
+#if defined USE_NATIVE_THREAD_INIT
 	native_thread_init_stack(th);
 #endif
 	native_thread_init(th);
 	/* run */
+#if defined USE_NATIVE_THREAD_INIT
+	thread_start_func_2(th, th->machine_stack_start, rb_ia64_bsp());
+#else
 	thread_start_func_2(th, &stack_start, rb_ia64_bsp());
+#endif
     }
 #if USE_THREAD_CACHE
     if (1) {
@@ -837,6 +861,19 @@ native_sleep(rb_thread_t *th, struct timeval *timeout_tv)
 	timeout_rel.tv_sec = timeout_tv->tv_sec;
 	timeout_rel.tv_nsec = timeout_tv->tv_usec * 1000;
 
+	/* Solaris cond_timedwait() return EINVAL if an argument is greater than
+	 * current_time + 100,000,000.  So cut up to 100,000,000.  This is
+	 * considered as a kind of spurious wakeup.  The caller to native_sleep
+	 * should care about spurious wakeup.
+	 *
+	 * See also [Bug #1341] [ruby-core:29702]
+	 * http://download.oracle.com/docs/cd/E19683-01/816-0216/6m6ngupgv/index.html
+	 */
+	if (timeout_rel.tv_sec > 100000000) {
+	    timeout_rel.tv_sec = 100000000;
+	    timeout_rel.tv_nsec = 0;
+	}
+
 	timeout = native_cond_timeout(cond, timeout_rel);
     }
 
@@ -910,7 +947,7 @@ add_signal_thread_list(rb_thread_t *th)
 
 	    if (list == 0) {
 		fprintf(stderr, "[FATAL] failed to allocate memory\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	    }
 
 	    list->th = th;
@@ -1123,8 +1160,6 @@ thread_timer(void *p)
 static void
 rb_thread_create_timer_thread(void)
 {
-    rb_enable_interrupt();
-
     if (!timer_thread_id) {
 	pthread_attr_t attr;
 	int err;
@@ -1187,8 +1222,6 @@ rb_thread_create_timer_thread(void)
 	    exit(EXIT_FAILURE);
 	}
     }
-
-    rb_disable_interrupt(); /* only timer thread recieve signal */
 }
 
 static int
@@ -1260,5 +1293,17 @@ ruby_stack_overflowed_p(const rb_thread_t *th, const void *addr)
     return 0;
 }
 #endif
+
+int
+rb_reserved_fd_p(int fd)
+{
+    if (fd == timer_thread_pipe[0] ||
+	fd == timer_thread_pipe[1]) {
+	return 1;
+    }
+    else {
+	return 0;
+    }
+}
 
 #endif /* THREAD_SYSTEM_DEPENDENT_IMPLEMENTATION */

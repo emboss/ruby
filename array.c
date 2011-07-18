@@ -2563,6 +2563,40 @@ rb_ary_slice_bang(int argc, VALUE *argv, VALUE ary)
     return rb_ary_delete_at(ary, NUM2LONG(arg1));
 }
 
+static VALUE
+ary_reject(VALUE orig, VALUE result)
+{
+    long i;
+
+    for (i = 0; i < RARRAY_LEN(orig); i++) {
+	VALUE v = RARRAY_PTR(orig)[i];
+	if (!RTEST(rb_yield(v))) {
+	    rb_ary_push_1(result, v);
+	}
+    }
+    return result;
+}
+
+static VALUE
+ary_reject_bang(VALUE ary)
+{
+    long i;
+    VALUE result = Qnil;
+
+    rb_ary_modify_check(ary);
+    for (i = 0; i < RARRAY_LEN(ary); ) {
+	VALUE v = RARRAY_PTR(ary)[i];
+	if (RTEST(rb_yield(v))) {
+	    rb_ary_delete_at(ary, i);
+	    result = ary;
+	}
+	else {
+	    i++;
+	}
+    }
+    return result;
+}
+
 /*
  *  call-seq:
  *     ary.reject! {|item| block }  -> ary or nil
@@ -2580,23 +2614,8 @@ rb_ary_slice_bang(int argc, VALUE *argv, VALUE ary)
 static VALUE
 rb_ary_reject_bang(VALUE ary)
 {
-    long i1, i2;
-
     RETURN_ENUMERATOR(ary, 0, 0);
-    rb_ary_modify(ary);
-    for (i1 = i2 = 0; i1 < RARRAY_LEN(ary); i1++) {
-	VALUE v = RARRAY_PTR(ary)[i1];
-	if (RTEST(rb_yield(v))) continue;
-	if (i1 != i2) {
-	    rb_ary_store(ary, i2, v);
-	}
-	i2++;
-    }
-
-    if (RARRAY_LEN(ary) == i2) return Qnil;
-    if (i2 < RARRAY_LEN(ary))
-	ARY_SET_LEN(ary, i2);
-    return ary;
+    return ary_reject_bang(ary);
 }
 
 /*
@@ -2615,10 +2634,12 @@ rb_ary_reject_bang(VALUE ary)
 static VALUE
 rb_ary_reject(VALUE ary)
 {
+    VALUE rejected_ary;
+
     RETURN_ENUMERATOR(ary, 0, 0);
-    ary = rb_ary_dup(ary);
-    rb_ary_reject_bang(ary);
-    return ary;
+    rejected_ary = rb_ary_new();
+    ary_reject(ary, rejected_ary);
+    return rejected_ary;
 }
 
 /*
@@ -2640,7 +2661,7 @@ static VALUE
 rb_ary_delete_if(VALUE ary)
 {
     RETURN_ENUMERATOR(ary, 0, 0);
-    rb_ary_reject_bang(ary);
+    ary_reject_bang(ary);
     return ary;
 }
 
