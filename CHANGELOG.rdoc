@@ -1,4 +1,7 @@
 === 2011-07-17 [emboss]
+* Test for algorithm constants encoding. It should be UTF-8.
+
+=== 2011-07-17 [emboss]
 * Continued document implementation and added algorithm constants.
 
 === 2011-07-17 [emboss]
