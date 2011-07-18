@@ -44,6 +44,27 @@ extern VALUE mXMLDSIG;
 extern VALUE eXMLDSIGError;
 
 /*
+ * Algorithm constants
+ */
+extern VALUE mSignatureAlgorithms;
+extern VALUE mTransformAlgorithms;
+extern VALUE mDigestAlgorithms;
+extern VALUE mHmacAlgorithms;
+
+extern ID sRSA_SHA1, sRSA_SHA256, sRSA_SHA384, sRSA_SHA512;
+extern ID sDSA_SHA1, sDSA_SHA256;
+extern ID sECDSA_SHA1, sECDSA_SHA256, sECDSA_SHA384, sECDSA_SHA512;
+
+extern ID sC14N_10, sC14N_11, sEXC_C14N_10, sC14N_10_COMMENTS, sC14N_11_COMMENTS, sEXC_C14N_10_COMMENTS;
+extern ID sBASE64;
+extern ID sENVELOPED_SIGNATURE;
+extern ID sXPATH, sXPATH_FILTER2, sXSLT;
+
+extern ID sSHA1, sSHA256, sSHA384, sSHA512;
+
+extern ID sHMAC_SHA1, sHMAC_SHA256, sHMAC_SHA384, sHMAC_SHA512;
+
+/*
  * CheckTypes
  */
 #define XMLDSIG_Check_Kind(obj, klass) do {\

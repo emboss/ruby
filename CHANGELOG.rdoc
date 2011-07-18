@@ -1,4 +1,7 @@
 === 2011-07-17 [emboss]
+* Continued document implementation and added algorithm constants.
+
+=== 2011-07-17 [emboss]
 * Implement document parsing and re-encoding.
 
 === 2011-07-17 [emboss]
