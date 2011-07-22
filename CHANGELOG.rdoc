@@ -1,3 +1,7 @@
+=== 2011-07-23 [emboss]
+* Implemented Transform and Reference.
+* Set default signing parameters.
+
 === 2011-07-17 [emboss]
 * Test for algorithm constants encoding. It should be UTF-8.
 

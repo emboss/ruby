@@ -9,6 +9,7 @@
  * (See the file 'LICENCE'.)
  */
 #include "xmldsig.h"
+#include "xmldsig-internal.h"
 
 /*
  * main module
@@ -37,6 +38,10 @@ ID sXPATH, sXPATH_FILTER2, sXSLT;
 ID sSHA1, sSHA256, sSHA384, sSHA512;
 
 ID sHMAC_SHA1, sHMAC_SHA256, sHMAC_SHA384, sHMAC_SHA512;
+
+ID sKEY, sCERT, sCA_CERTS, sSIGNATURE_METHOD,
+   sDIGEST_METHOD, sC14N_METHOD, sREFERENCES,
+   sTRANSFORMS, sID, sURI, sTYPE;
 
 
 VALUE
@@ -109,6 +114,18 @@ Init_xmldsig(void)
     sHMAC_SHA384 = rb_intern("HMAC_SHA384");
     sHMAC_SHA512 = rb_intern("HMAC_SHA512");
     
+    sKEY = rb_intern("key");
+    sCERT = rb_intern("cert");
+    sCA_CERTS = rb_intern("ca_certs");
+    sSIGNATURE_METHOD = rb_intern("signature_method");
+    sC14N_METHOD = rb_intern("c14n_method");
+    sDIGEST_METHOD = rb_intern("digest_method");
+    sREFERENCES = rb_intern("references");
+    sTRANSFORMS = rb_intern("transforms");
+    sID = rb_intern("id");
+    sURI = rb_intern("uri");
+    sTYPE = rb_intern("type");
+
     utf8 = rb_enc_find("UTF-8");
 
     rb_const_set(mSignatureAlgorithms, sRSA_SHA1, rb_enc_associate(rb_str_new2("http://www.w3.org/2000/09/xmldsig#rsa-sha1"), utf8));

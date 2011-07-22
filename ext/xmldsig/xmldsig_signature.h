@@ -13,6 +13,8 @@
 
 
 extern VALUE cSignature;
+extern VALUE cReference;
+extern VALUE cTransform;
 
 void Init_xmldsig_signature(void);
 
