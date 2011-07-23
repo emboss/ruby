@@ -15,6 +15,9 @@ VALUE cSignature;
 VALUE cReference;
 VALUE cTransform;
 
+static xmlNodePtr int_xmldsig_prepare_signature(xmlDocPtr doc, sign_params_t *params, transform_t *transforms);
+static void int_xmldsig_set_digest_values(transform_t *transforms);
+
 static VALUE
 xmldsig_reference_init(int argc, VALUE *argv, VALUE self)
 {
@@ -33,6 +36,50 @@ xmldsig_transform_init(VALUE self, VALUE algorithm)
 {
     rb_iv_set(self, "algorithm", algorithm);
     return self;
+}
+
+
+static xmlNodePtr
+int_xmldsig_prepare_signature(xmlDocPtr doc, sign_params_t *params, transform_t *transforms)
+{
+    /* TODO */
+    return NULL;
+}
+
+static void
+int_xmldsig_set_digest_values(transform_t *transforms)
+{
+    /* TODO */
+}
+
+VALUE
+xmldsig_sig_sign(xmlDocPtr doc, sign_params_t *params)
+{
+    transform_t *transforms;
+    transform_result_t *transform_result;
+    xmlNodePtr signature_node;
+
+    if (!(transforms = xmldsig_transforms_new()))
+	rb_raise(rb_eRuntimeError, NULL);
+    
+    signature_node = int_xmldsig_prepare_signature(doc, params, transforms);
+    transform_result = xmldsig_transforms_execute(transforms);
+    int_xmldsig_set_digest_values(transforms);
+
+    if (!transform_result->bytes) {
+	/* need to apply a final default c14n 1.0 */
+	transform_result->bytes_len = xmlC14NDocDumpMemory(doc, 
+							   transform_result->nodes, 
+							   0, 
+							   NULL, 
+							   0, 
+							   &transform_result->bytes);
+    }
+
+    xmldsig_transforms_free(transforms);
+    xmldsig_transform_result_free(transform_result);
+
+    return Qnil;
 }
 
 void
@@ -60,3 +107,4 @@ Init_xmldsig_signature(void)
     rb_define_method(cTransform, "initialize", xmldsig_transform_init, 1);
     rb_attr(cTransform, rb_intern("algorithm"), 1, 1, Qfalse);
 }
+

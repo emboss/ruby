@@ -35,17 +35,7 @@
 #define xmldsig_params_get_c14n_method(params)		rb_hash_aref((params), ID2SYM(sC14N_METHOD))
 #define xmldsig_params_get_references(params)		rb_hash_aref((params), ID2SYM(sREFERENCES))
 
-typedef struct sign_params_st {
-    VALUE key;
-    VALUE cert;
-    VALUE ca_certs;
-    VALUE signature_method;
-    VALUE c14n_method;
-    VALUE references;
-} sign_params_t;
-
 VALUE cDocument;
-
 
 static VALUE int_parse_signatures(VALUE self);
 
@@ -66,6 +56,11 @@ xmldsig_doc_new(VALUE self, VALUE raw)
 
     StringValue(raw);
     xmlInitParser();
+    /* TODO: xmlsec says
+    / required for c14n! /
+    ctxt->loadsubset = XML_DETECT_IDS | XML_COMPLETE_ATTRS;
+    ctxt->replaceEntities = 1;
+    */
     doc = xmlParseDoc((unsigned char *)RSTRING_PTR(raw));
     xmlCleanupParser();
 
@@ -152,13 +147,6 @@ int_init_params(sign_params_t *sign_params, VALUE pkey, VALUE params)
 }
 
 static VALUE
-int_doc_sign(xmlDocPtr doc, sign_params_t *params)
-{
-    /* TODO */
-    return Qnil;
-}
-
-static VALUE
 xmldsig_doc_sign(int argc, VALUE *argv, VALUE self)
 {
     xmlDocPtr doc;
@@ -169,7 +157,7 @@ xmldsig_doc_sign(int argc, VALUE *argv, VALUE self)
 
     int_init_params(&sign_params, pkey, params);
     GetXmlDoc(self, doc);
-    signature = int_doc_sign(doc, &sign_params);
+    signature = xmldsig_sig_sign(doc, &sign_params);
     signatures = xmldsig_doc_signatures(self);
     rb_ary_push(signatures, signature);
 
