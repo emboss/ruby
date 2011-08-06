@@ -80,7 +80,9 @@ struct reference_st {
 struct transform_st {
     xmlNodePtr node; /* the node representing this transform */
     unsigned char *in_buf; /* set if the input to this transform is binary data */
+    long in_len;
     unsigned char *out_buf; /* set if the output of this transform is binary data */
+    long out_len;
     xmlNodeSetPtr in_nodes; /* set if the input to this transform is a node set */
     xmlNodeSetPtr out_nodes; /* set if the output to this transform is a node set */
     xmldsig_transform *prev;
@@ -123,6 +125,11 @@ VALUE xmldsig_signature_init(xmlNodePtr signature);
 VALUE xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *encoding, xmldsig_sign_params *params);
 
 xmldsig_transform_result *xmldsig_transforms_execute(xmldsig_transform *transforms);
+
+xmldsig_transformer_cb xmldsig_transformer_cb_for(VALUE algorithm);
+
+/* transform callbacks */
+int xmldsig_enveloped_signature_transform(xmldsig_transform *transform);
 
 #if defined(__cplusplus)
 }

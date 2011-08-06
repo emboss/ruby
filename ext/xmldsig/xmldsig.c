@@ -42,9 +42,11 @@ ID sHMAC_SHA1, sHMAC_SHA256, sHMAC_SHA384, sHMAC_SHA512;
 ID sKEY, sCERT, sCA_CERTS, sSIGNATURE_METHOD,
    sDIGEST_METHOD, sC14N_METHOD, sREFERENCES,
    sTRANSFORMS, sALGORITHM, sSIGNATURE_VALUE,
-   sKEY_VALUE, sDIGEST_VALUE, sID, sURI, sTYPE;
+   sKEY_VALUE, sDIGEST_VALUE, sID, sURI, sTYPE,
+   sENCODING;
 
 const unsigned char *NS_DSIG, *NS_DSIG11; 
+const unsigned char *NS_DSIG_PREFIX, *NS_DSIG11_PREFIX;
 
 const unsigned char *N_SIGNATURE, *N_SIGNED_INFO, *N_SIGNATURE_VALUE,
                     *N_C14N_METHOD, *N_SIGNATURE_METHOD, *N_REFERENCE,
@@ -135,7 +137,9 @@ xmldsig_transforms_new(void) {
 
     transform->node = NULL;
     transform->in_buf = NULL;
+    transform->in_len = 0;
     transform->out_buf = NULL;
+    transform->out_len = 0;
     transform->in_nodes = NULL;
     transform->out_nodes = NULL;
     transform->prev = NULL;
@@ -194,13 +198,13 @@ Init_xmldsig(void)
     /* sanity check */
     LIBXML_TEST_VERSION
 
-    mXMLDSIG = rb_define_module("XmlDsig");
+    mXMLDSIG = rb_define_module("Xmldsig");
 
     /*
      * Generic error,
      * common for all classes under XmlDsig module
      */
-    eXMLDSIGError = rb_define_class_under(mXMLDSIG,"XmlDsigError",rb_eStandardError);
+    eXMLDSIGError = rb_define_class_under(mXMLDSIG,"XmldsigError",rb_eStandardError);
 
     /*
      * Init symbols and algorithm classes
@@ -269,7 +273,7 @@ Init_xmldsig(void)
     N_SIGNATURE_METHOD = CHAR2BYTES("SignatureMethod");
     N_REFERENCE = CHAR2BYTES("Reference");
     N_TRANSFORMS = CHAR2BYTES("Transforms");
-    N_TRANSFORM = CHAR2BYTES("Tranform");
+    N_TRANSFORM = CHAR2BYTES("Transform");
     N_DIGEST_METHOD = CHAR2BYTES("DigestMethod");
     N_DIGEST_VALUE = CHAR2BYTES("DigestValue");
 

@@ -48,7 +48,7 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
 {
     xmlNodePtr transform_node;
     xmldsig_transform *transform;
-    VALUE algorithm;
+    VALUE algorithm_id, algorithm;
 
     if (!(transform = xmldsig_transforms_new())) {
 	xmldsig_sign_ctx_free(ctx, 1);
@@ -58,10 +58,12 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
     transform_node = xmlNewChild(transforms_node, ctx->ns_dsig, N_TRANSFORM, NULL);
     transform->node = transform_node;
 
-    algorithm = rb_ivar_get(param_transform, sALGORITHM);
+    algorithm_id = rb_ivar_get(param_transform, sALGORITHM);
+    transform->transformer = xmldsig_transformer_cb_for(algorithm_id);
+    algorithm = rb_const_get(mTransformAlgorithms, SYM2ID(algorithm_id));
     StringValue(algorithm);
     rb_enc_associate(algorithm, ctx->doc_encoding);
-    xmlNewProp(transforms_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(algorithm)));
+    xmlNewProp(transform_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(algorithm)));
 
     /* TODO: XPath */
 
@@ -80,7 +82,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
     xmlNodePtr ref_node, transforms_node, digest_method_node;
     xmldsig_reference *ref;
     rb_encoding *encoding;
-    VALUE id, uri, type, transforms, digest_method;
+    VALUE id, uri, type, transforms, digest_method_id, digest_method;
     long transform_len, i;
     xmldsig_transform *cur_transform = NULL, *prev_transform = NULL;
 
@@ -124,7 +126,8 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
     }
 
     digest_method_node = xmlNewChild(ref_node, ctx->ns_dsig, N_DIGEST_METHOD, NULL);
-    digest_method = rb_ivar_get(param_ref, sDIGEST_METHOD);
+    digest_method_id = rb_ivar_get(param_ref, sDIGEST_METHOD);
+    digest_method = rb_const_get(mDigestAlgorithms, SYM2ID(digest_method_id));
     StringValue(digest_method);
     rb_enc_associate(digest_method, encoding);
     xmlNewProp(digest_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(digest_method)));
@@ -137,9 +140,9 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
 static xmlNodePtr
 int_xmldsig_prepare_signature(xmldsig_sign_ctx *ctx, xmldsig_sign_params *params)
 {
-    xmlNodePtr root, signature, signed_info, c14n_method, signature_method;
+    xmlNodePtr root, signature, signed_info, c14n_method_node, signature_method_node;
     xmlNsPtr ns_dsig;
-    VALUE refs;
+    VALUE refs, c14n_method, signature_method;
     long ref_len, i;
     xmldsig_reference *cur_ref = NULL, *prev_ref = NULL;
 
@@ -153,14 +156,16 @@ int_xmldsig_prepare_signature(xmldsig_sign_ctx *ctx, xmldsig_sign_params *params
     signed_info = xmlNewChild(signature, ns_dsig, N_SIGNED_INFO, NULL);
     ctx->signed_info = signed_info;
 
-    c14n_method = xmlNewChild(signed_info, ns_dsig, N_C14N_METHOD, NULL);
-    signature_method = xmlNewChild(signed_info, ns_dsig, N_SIGNATURE_METHOD, NULL);
+    c14n_method_node = xmlNewChild(signed_info, ns_dsig, N_C14N_METHOD, NULL);
+    signature_method_node = xmlNewChild(signed_info, ns_dsig, N_SIGNATURE_METHOD, NULL);
 
-    StringValue(params->c14n_method);
-    xmlNewProp(c14n_method, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(params->c14n_method)));
+    c14n_method = rb_const_get(mTransformAlgorithms, SYM2ID(params->c14n_method));
+    StringValue(c14n_method);
+    xmlNewProp(c14n_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(c14n_method)));
 
-    StringValue(params->signature_method);
-    xmlNewProp(signature_method, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(params->signature_method)));
+    signature_method = rb_const_get(mSignatureAlgorithms, SYM2ID(params->signature_method));
+    StringValue(signature_method);
+    xmlNewProp(signature_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(signature_method)));
 
     refs = params->references;
     ref_len = RARRAY_LEN(refs);
@@ -196,8 +201,9 @@ int_xmldsig_compute_references(xmldsig_sign_ctx *ctx)
 	xmldsig_transform_result *result;
 
 	result = xmldsig_transforms_execute(cur_ref->transforms);
-	if (!result->bytes) {
-	    /* need to apply a final default c14n 1.0 */
+
+	/* if (!result->bytes) {
+	    need to apply a final default c14n 1.0
 	    result->bytes_len = xmlC14NDocDumpMemory(ctx->doc, 
 						     result->nodes, 
 						     0, 
@@ -205,6 +211,7 @@ int_xmldsig_compute_references(xmldsig_sign_ctx *ctx)
 						     0, 
 						     &result->bytes);
 	}
+	*/
 
 	/* TODO */
 

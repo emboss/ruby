@@ -11,30 +11,30 @@
 #include "xmldsig.h"
 #include "xmldsig-internal.h"
 
-transform_t *
-xmldsig_transforms_new(void)
+
+int
+xmldsig_enveloped_signature_transform(xmldsig_transform *transform)
 {
+    /* TODO */
+    return 1;
+}
+
+xmldsig_transformer_cb xmldsig_transformer_cb_for(VALUE algorithm)
+{
+   ID algo_id;
+
+   algo_id = SYM2ID(algorithm);
+   if (algo_id == sENVELOPED_SIGNATURE)
+       return xmldsig_enveloped_signature_transform;
+   else {
+       rb_raise(rb_eRuntimeError, "Unsupported transform algorithm");
+       return NULL; /* dummy */
+   }
+}
+
+xmldsig_transform_result *
+xmldsig_transforms_execute(xmldsig_transform *transforms)
+{
+    /* TODO */
     return NULL;
-}
-
-void
-xmldsig_transforms_free(transform_t *transform)
-{
-}
-
-transform_result_t *
-xmldsig_transforms_execute(transform_t *transforms)
-{
-    return NULL;
-}
-
-transform_result_t *
-xmldsig_transform_result_new()
-{
-    return null;
-}
-
-void
-xmldsig_transform_result_free(transform_result_t *result)
-{
 }

@@ -1,4 +1,7 @@
 === 2011-08-06 [emboss]
+* Completed preparation of signature.
+
+=== 2011-08-06 [emboss]
 * Renamed types
 * Continued signature implementation.
 

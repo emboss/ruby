@@ -124,9 +124,9 @@ int_xmldsig_init_params(xmldsig_sign_params *sign_params, VALUE pkey, VALUE para
 
     /* defaults */
     if (NIL_P(sign_params->signature_method))
-	sign_params->signature_method = rb_const_get(mSignatureAlgorithms, sRSA_SHA256);
+	sign_params->signature_method = ID2SYM(sRSA_SHA256);
     if (NIL_P(sign_params->c14n_method))
-	sign_params->c14n_method = rb_const_get(mTransformAlgorithms, sC14N_10);
+	sign_params->c14n_method = ID2SYM(sC14N_10);
     if (NIL_P(sign_params->references)) {
 	VALUE ref_ary, ref, transforms_ary, enveloped_sig;
        
@@ -137,7 +137,7 @@ int_xmldsig_init_params(xmldsig_sign_params *sign_params, VALUE pkey, VALUE para
 	rb_ary_push(transforms_ary, enveloped_sig);
 	ref = rb_funcall(cReference, rb_intern("new"), 1, transforms_ary);
 	rb_ivar_set(ref, sURI, rb_str_new2(""));
-	rb_ivar_set(ref, sDIGEST_METHOD, sSHA256);
+	rb_ivar_set(ref, sDIGEST_METHOD, ID2SYM(sSHA256));
 	rb_ivar_set(ref, sTRANSFORMS, transforms_ary);
 	rb_ary_push(ref_ary, ref);
 	sign_params->references = ref_ary;
