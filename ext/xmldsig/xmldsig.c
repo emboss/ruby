@@ -41,8 +41,17 @@ ID sHMAC_SHA1, sHMAC_SHA256, sHMAC_SHA384, sHMAC_SHA512;
 
 ID sKEY, sCERT, sCA_CERTS, sSIGNATURE_METHOD,
    sDIGEST_METHOD, sC14N_METHOD, sREFERENCES,
-   sTRANSFORMS, sID, sURI, sTYPE;
+   sTRANSFORMS, sALGORITHM, sSIGNATURE_VALUE,
+   sKEY_VALUE, sDIGEST_VALUE, sID, sURI, sTYPE;
 
+const unsigned char *NS_DSIG, *NS_DSIG11; 
+
+const unsigned char *N_SIGNATURE, *N_SIGNED_INFO, *N_SIGNATURE_VALUE,
+                    *N_C14N_METHOD, *N_SIGNATURE_METHOD, *N_REFERENCE,
+		    *N_TRANSFORMS, *N_TRANSFORM, 
+		    *N_DIGEST_METHOD, *N_DIGEST_VALUE;
+
+const unsigned char *A_ALGORITHM, *A_ID, *A_URI, *A_TYPE;
 
 VALUE
 xml_dsig_get_encoding(xmlDocPtr doc)
@@ -59,6 +68,123 @@ xml_dsig_get_encoding(xmlDocPtr doc)
 	rb_raise(eXMLDSIGError, "Could not load encoding %s", encoding);
     return rb_enc_from_encoding(rb_enc);
 }
+
+xmldsig_sign_ctx *
+xmldsig_sign_ctx_new(void) {
+    xmldsig_sign_ctx *ctx;
+
+    if (!(ctx = (xmldsig_sign_ctx *)malloc(sizeof(xmldsig_sign_ctx))))
+	return NULL;
+
+    ctx->doc = NULL;
+    ctx->doc_encoding = NULL;
+    ctx->ns_dsig = NULL;
+    ctx->signature = NULL;
+    ctx->signed_info = NULL;
+    ctx->references =NULL;
+
+    return ctx;
+}
+
+void
+xmldsig_sign_ctx_free(xmldsig_sign_ctx *ctx, int with_node) {
+    if (!ctx) return;
+
+    /* free(ctx->doc_encoding); ? */
+    xmlFreeNs(ctx->ns_dsig);
+    xmldsig_reference_free(ctx->references, 0);
+    if (with_node) xmlFreeNode(ctx->signature);
+    free(ctx);
+}
+
+xmldsig_reference *
+xmldsig_reference_new(void) {
+    xmldsig_reference *ref;
+
+    if (!(ref = (xmldsig_reference *)malloc(sizeof(xmldsig_reference))))
+	return NULL;
+
+    ref->node = NULL;
+    ref->transforms = NULL;
+    ref->prev = NULL;
+    ref->next = NULL;
+
+    return ref;
+}
+
+void
+xmldsig_reference_free(xmldsig_reference *reference, int with_node) {
+    if (!reference) return;
+
+    if (reference->next) 
+	xmldsig_reference_free(reference->next, with_node);
+
+    if (with_node) xmlFreeNode(reference->node);
+    
+    xmldsig_transforms_free(reference->transforms, 0);
+
+    free(reference);
+}
+
+xmldsig_transform *
+xmldsig_transforms_new(void) {
+    xmldsig_transform *transform;
+
+    if (!(transform = (xmldsig_transform *)malloc(sizeof(xmldsig_transform))))
+	return NULL;
+
+    transform->node = NULL;
+    transform->in_buf = NULL;
+    transform->out_buf = NULL;
+    transform->in_nodes = NULL;
+    transform->out_nodes = NULL;
+    transform->prev = NULL;
+    transform->next = NULL;
+    transform->transformer = NULL;
+
+    return transform;
+}
+    
+void
+xmldsig_transforms_free(xmldsig_transform *transforms, int with_node) {
+    if (!transforms) return;
+
+    if (transforms->next)
+	xmldsig_transforms_free(transforms->next, with_node);
+
+    if (with_node) xmlFreeNode(transforms->node);
+
+    free(transforms->in_buf);
+    free(transforms->out_buf);
+    xmlXPathFreeNodeSet(transforms->in_nodes);
+    xmlXPathFreeNodeSet(transforms->out_nodes);
+
+    free(transforms);
+}
+
+xmldsig_transform_result *
+xmldsig_transform_result_new(void) {
+    xmldsig_transform_result *result;
+
+    if (!(result = (xmldsig_transform_result *)malloc(sizeof(xmldsig_transform_result))))
+	return NULL;
+
+    result->bytes_len = 0;
+    result->bytes = NULL;
+    result->nodes = NULL;
+
+    return result;
+}
+
+void
+xmldsig_transform_result_free(xmldsig_transform_result *result) {
+    if (!result) return;
+
+    free(result->bytes);
+    xmlXPathFreeNodeSet(result->nodes);
+    free(result);
+}
+
 
 void
 Init_xmldsig(void)
@@ -122,9 +248,35 @@ Init_xmldsig(void)
     sDIGEST_METHOD = rb_intern("digest_method");
     sREFERENCES = rb_intern("references");
     sTRANSFORMS = rb_intern("transforms");
+    sALGORITHM = rb_intern("algorithm");
+    sSIGNATURE_VALUE = rb_intern("signature_value");
+    sDIGEST_VALUE = rb_intern("digest_value");
+    sKEY_VALUE = rb_intern("key_value");
     sID = rb_intern("id");
     sURI = rb_intern("uri");
     sTYPE = rb_intern("type");
+    sENCODING = rb_intern("encoding");
+
+    NS_DSIG = CHAR2BYTES("http://www.w3.org/2000/09/xmldsig#");
+    NS_DSIG11 = CHAR2BYTES("http://www.w3.org/2000/xmldsig11#");
+    NS_DSIG_PREFIX = CHAR2BYTES("dsig");
+    NS_DSIG11_PREFIX = CHAR2BYTES("dsig11");
+
+    N_SIGNATURE = CHAR2BYTES("Signature");
+    N_SIGNED_INFO = CHAR2BYTES("SignedInfo");
+    N_SIGNATURE_VALUE = CHAR2BYTES("SignatureValue");
+    N_C14N_METHOD = CHAR2BYTES("CanonicalizationMethod");
+    N_SIGNATURE_METHOD = CHAR2BYTES("SignatureMethod");
+    N_REFERENCE = CHAR2BYTES("Reference");
+    N_TRANSFORMS = CHAR2BYTES("Transforms");
+    N_TRANSFORM = CHAR2BYTES("Tranform");
+    N_DIGEST_METHOD = CHAR2BYTES("DigestMethod");
+    N_DIGEST_VALUE = CHAR2BYTES("DigestValue");
+
+    A_ALGORITHM = CHAR2BYTES("Algorithm");
+    A_ID = CHAR2BYTES("Id");
+    A_URI = CHAR2BYTES("URI");
+    A_TYPE = CHAR2BYTES("Type");
 
     utf8 = rb_enc_find("UTF-8");
 

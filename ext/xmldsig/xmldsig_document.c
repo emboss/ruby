@@ -37,8 +37,6 @@
 
 VALUE cDocument;
 
-static VALUE int_parse_signatures(VALUE self);
-
 static void
 xmldsig_free_doc(xmlDocPtr doc)
 {
@@ -69,7 +67,7 @@ xmldsig_doc_new(VALUE self, VALUE raw)
 
     WrapXmlDoc(cDocument, self, doc);
     encoding = xml_dsig_get_encoding(doc);
-    rb_ivar_set(self, rb_intern("encoding"), encoding);
+    rb_ivar_set(self, sENCODING, encoding);
     return self;
 }
 
@@ -87,14 +85,14 @@ xmldsig_doc_bytes(VALUE self)
     if (size <= 0)
        rb_raise(eXMLDSIGError, "Error when encoding the Document");	
     ret_val = rb_str_new2((char *)encoded);
-    rb_enc_associate(ret_val, rb_to_encoding(rb_iv_get(self, "encoding")));
+    rb_enc_associate(ret_val, rb_to_encoding(rb_ivar_get(self, sENCODING)));
 
     return ret_val;
 }
 
 
 static VALUE
-int_parse_signatures(VALUE self) {
+int_xmldsig_parse_signatures(VALUE self) {
     /* TODO */
     return rb_ary_new();
 }
@@ -107,7 +105,7 @@ xmldsig_doc_signatures(VALUE self)
     signatures = rb_iv_get(self, "signatures");
 
     if (NIL_P(signatures)) {
-	signatures = int_parse_signatures(self);
+	signatures = int_xmldsig_parse_signatures(self);
 	rb_iv_set(self, "signatures", signatures);
     }
 
@@ -115,7 +113,7 @@ xmldsig_doc_signatures(VALUE self)
 }
 
 static void
-int_init_params(sign_params_t *sign_params, VALUE pkey, VALUE params)
+int_xmldsig_init_params(xmldsig_sign_params *sign_params, VALUE pkey, VALUE params)
 {
     sign_params->key = pkey;
     sign_params->cert = NIL_P(params) ? Qnil : xmldsig_params_get_cert(params);
@@ -151,13 +149,15 @@ xmldsig_doc_sign(int argc, VALUE *argv, VALUE self)
 {
     xmlDocPtr doc;
     VALUE pkey, params, signature, signatures;
-    sign_params_t sign_params;
+    rb_encoding *encoding;
+    xmldsig_sign_params sign_params;
 
     rb_scan_args(argc, argv, "11", &pkey, &params);
 
-    int_init_params(&sign_params, pkey, params);
+    int_xmldsig_init_params(&sign_params, pkey, params);
     GetXmlDoc(self, doc);
-    signature = xmldsig_sig_sign(doc, &sign_params);
+    encoding = rb_to_encoding(rb_ivar_get(self, sENCODING));
+    signature = xmldsig_sig_sign(doc, encoding, &sign_params);
     signatures = xmldsig_doc_signatures(self);
     rb_ary_push(signatures, signature);
 
@@ -170,7 +170,7 @@ Init_xmldsig_document(void)
     cDocument = rb_define_class_under(mXMLDSIG, "Document", rb_cObject);
     rb_define_singleton_method(cDocument, "new", xmldsig_doc_new, 1);
 
-    rb_attr(cDocument, rb_intern("encoding"), 1, 0, Qfalse);
+    rb_attr(cDocument, sENCODING, 1, 0, Qfalse);
     rb_define_method(cDocument, "bytes", xmldsig_doc_bytes, 0);
     rb_define_method(cDocument, "signatures", xmldsig_doc_signatures, 0);
     rb_define_method(cDocument, "sign", xmldsig_doc_sign, -1);

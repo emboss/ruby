@@ -1,3 +1,7 @@
+=== 2011-08-06 [emboss]
+* Renamed types
+* Continued signature implementation.
+
 === 2011-07-23 [emboss]
 * Started transforms infrastructure.
 
