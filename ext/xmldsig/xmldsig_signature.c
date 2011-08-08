@@ -51,7 +51,7 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
     VALUE algorithm_id, algorithm;
 
     if (!(transform = xmldsig_transforms_new())) {
-	xmldsig_sign_ctx_free(ctx, 1);
+	xmldsig_sign_ctx_free(ctx);
 	rb_raise(rb_eRuntimeError, NULL);
     }
 
@@ -87,7 +87,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
     xmldsig_transform *cur_transform = NULL, *prev_transform = NULL;
 
     if (!(ref = xmldsig_reference_new())) {
-	xmldsig_sign_ctx_free(ctx, 1);
+	xmldsig_sign_ctx_free(ctx);
 	rb_raise(rb_eRuntimeError, NULL);
     }
 
@@ -141,23 +141,20 @@ static xmlNodePtr
 int_xmldsig_prepare_signature(xmldsig_sign_ctx *ctx, xmldsig_sign_params *params)
 {
     xmlNodePtr root, signature, signed_info, c14n_method_node, signature_method_node;
-    xmlNsPtr ns_dsig;
     VALUE refs, c14n_method, signature_method;
     long ref_len, i;
     xmldsig_reference *cur_ref = NULL, *prev_ref = NULL;
 
     root = xmlDocGetRootElement(ctx->doc);
-    ns_dsig = xmlNewNs(root, NS_DSIG, NS_DSIG_PREFIX);
-    ctx->ns_dsig = ns_dsig;
-
-    signature = xmlNewChild(root, ns_dsig, N_SIGNATURE, NULL);
+    
+    signature = xmlNewChild(root, ctx->ns_dsig, N_SIGNATURE, NULL);
     ctx->signature = signature;
 
-    signed_info = xmlNewChild(signature, ns_dsig, N_SIGNED_INFO, NULL);
+    signed_info = xmlNewChild(signature, ctx->ns_dsig, N_SIGNED_INFO, NULL);
     ctx->signed_info = signed_info;
 
-    c14n_method_node = xmlNewChild(signed_info, ns_dsig, N_C14N_METHOD, NULL);
-    signature_method_node = xmlNewChild(signed_info, ns_dsig, N_SIGNATURE_METHOD, NULL);
+    c14n_method_node = xmlNewChild(signed_info, ctx->ns_dsig, N_C14N_METHOD, NULL);
+    signature_method_node = xmlNewChild(signed_info, ctx->ns_dsig, N_SIGNATURE_METHOD, NULL);
 
     c14n_method = rb_const_get(mTransformAlgorithms, SYM2ID(params->c14n_method));
     StringValue(c14n_method);
@@ -190,6 +187,19 @@ int_xmldsig_prepare_signature(xmldsig_sign_ctx *ctx, xmldsig_sign_params *params
     return signature;
 }
 
+static void
+int_xmldsig_set_reference_input_nodes(xmldsig_sign_ctx *ctx)
+{
+    xmldsig_reference *refs;
+
+    refs = ctx->references;
+
+    while (refs) {
+	refs->transforms->in_nodes = xmldsig_input_nodes_for_ref(refs->node);
+	refs = refs->next;
+    }
+}
+
 static void	
 int_xmldsig_compute_references(xmldsig_sign_ctx *ctx)
 {
@@ -198,24 +208,13 @@ int_xmldsig_compute_references(xmldsig_sign_ctx *ctx)
     cur_ref = ctx->references;
 
     while (cur_ref) {
-	xmldsig_transform_result *result;
+	int result;
 
 	result = xmldsig_transforms_execute(cur_ref->transforms);
-
-	/* if (!result->bytes) {
-	    need to apply a final default c14n 1.0
-	    result->bytes_len = xmlC14NDocDumpMemory(ctx->doc, 
-						     result->nodes, 
-						     0, 
-						     NULL, 
-						     0, 
-						     &result->bytes);
+	if (result != 0) {
+	    xmldsig_sign_ctx_free(ctx);
+	    rb_raise(eXMLDSIGError, "Computing the references failed.");
 	}
-	*/
-
-	/* TODO */
-
-	xmldsig_transform_result_free(result);
 	cur_ref = cur_ref->next;
     }
 }
@@ -224,6 +223,14 @@ static void
 int_xmldsig_finalize_signature(xmldsig_sign_ctx *ctx)
 {
     /* TODO */
+}
+
+static void
+int_xmldsig_sign_ctx_init(xmldsig_sign_ctx *ctx, xmlDocPtr doc, rb_encoding *doc_encoding)
+{
+    ctx->doc = doc;
+    ctx->doc_encoding = doc_encoding;
+    ctx->ns_dsig = xmlNewNs(xmlDocGetRootElement(ctx->doc), NS_DSIG, NS_DSIG_PREFIX);
 }
 
 VALUE
@@ -235,14 +242,13 @@ xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *doc_encoding, xmldsig_sign_params *
     if (!(ctx = xmldsig_sign_ctx_new()))
 	rb_raise(rb_eRuntimeError, NULL);
     
-    ctx->doc = doc;
-    ctx->doc_encoding = doc_encoding;
-
+    int_xmldsig_sign_ctx_init(ctx, doc, doc_encoding);
     int_xmldsig_prepare_signature(ctx, params);
+    int_xmldsig_set_reference_input_nodes(ctx);
     int_xmldsig_compute_references(ctx);
     int_xmldsig_finalize_signature(ctx);
 
-    xmldsig_sign_ctx_free(ctx, 0);
+    xmldsig_sign_ctx_free(ctx);
     signature = xmldsig_signature_init(ctx->signature);
     return signature;
 }

@@ -90,12 +90,6 @@ struct transform_st {
     xmldsig_transformer_cb transformer; /* callback that executes this transform */
 };
 
-struct transform_result_st {
-    long          bytes_len;
-    unsigned char *bytes;
-    xmlNodeSetPtr nodes;
-};
-
 struct sign_ctx_st {
     xmlDocPtr doc;
     rb_encoding *doc_encoding;
@@ -107,26 +101,41 @@ struct sign_ctx_st {
 
 xmldsig_sign_ctx *xmldsig_sign_ctx_new(void);
 
-void xmldsig_sign_ctx_free(xmldsig_sign_ctx *ctx, int with_node);
+void xmldsig_sign_ctx_free(xmldsig_sign_ctx *ctx);
 
 xmldsig_reference *xmldsig_reference_new(void);
-void xmldsig_reference_free(xmldsig_reference *reference, int with_node);
+void xmldsig_reference_free(xmldsig_reference *reference);
 
 xmldsig_transform *xmldsig_transforms_new(void);
-void xmldsig_transforms_free(xmldsig_transform *transforms, int with_node);
-
-xmldsig_transform_result *xmldsig_transform_result_new(void);
-void xmldsig_transform_result_free(xmldsig_transform_result *result);
-   
+void xmldsig_transforms_free(xmldsig_transform *transforms);
 
 /* public functions */
 VALUE xmldsig_signature_init(xmlNodePtr signature);
 
 VALUE xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *encoding, xmldsig_sign_params *params);
 
-xmldsig_transform_result *xmldsig_transforms_execute(xmldsig_transform *transforms);
+int xmldsig_transforms_execute(xmldsig_transform *transforms);
+
+xmlNodeSetPtr xmldsig_input_nodes_for_ref(xmlNodePtr ref_node);
 
 xmldsig_transformer_cb xmldsig_transformer_cb_for(VALUE algorithm);
+
+xmlNodeSetPtr xmldsig_node_set_create(xmlDocPtr doc, xmlNodePtr parent, int with_comments);
+
+xmlNodeSetPtr xmldsig_node_set_intersect(xmlNodeSetPtr set1, xmlNodeSetPtr set2);
+
+xmlNodeSetPtr xmldsig_node_set_subtract(xmlNodeSetPtr set1, xmlNodeSetPtr set2);
+
+/* helper functions */
+const unsigned char* xmldsig_ns_href_get(const xmlNodePtr node);
+
+xmlNodePtr xmldsig_find_parent(xmlNodePtr node, const unsigned char *name, const unsigned char *ns);
+
+xmlNodePtr xmldsig_find_child(xmlNodePtr node, const unsigned char *name, const unsigned char *ns);
+
+#define xmldsig_node_name_cmp(node, name, ns)	(xmlStrEqual((node)->name, (name)) && \
+						 xmlStrEqual(xmldsig_ns_href_get((node)), (ns)))
+
 
 /* transform callbacks */
 int xmldsig_enveloped_signature_transform(xmldsig_transform *transform);

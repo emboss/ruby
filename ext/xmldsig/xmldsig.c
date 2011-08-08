@@ -89,13 +89,11 @@ xmldsig_sign_ctx_new(void) {
 }
 
 void
-xmldsig_sign_ctx_free(xmldsig_sign_ctx *ctx, int with_node) {
+xmldsig_sign_ctx_free(xmldsig_sign_ctx *ctx) {
     if (!ctx) return;
 
     /* free(ctx->doc_encoding); ? */
-    xmlFreeNs(ctx->ns_dsig);
-    xmldsig_reference_free(ctx->references, 0);
-    if (with_node) xmlFreeNode(ctx->signature);
+    xmldsig_reference_free(ctx->references);
     free(ctx);
 }
 
@@ -115,15 +113,13 @@ xmldsig_reference_new(void) {
 }
 
 void
-xmldsig_reference_free(xmldsig_reference *reference, int with_node) {
+xmldsig_reference_free(xmldsig_reference *reference) {
     if (!reference) return;
 
     if (reference->next) 
-	xmldsig_reference_free(reference->next, with_node);
+	xmldsig_reference_free(reference->next);
 
-    if (with_node) xmlFreeNode(reference->node);
-    
-    xmldsig_transforms_free(reference->transforms, 0);
+    xmldsig_transforms_free(reference->transforms);
 
     free(reference);
 }
@@ -150,45 +146,19 @@ xmldsig_transforms_new(void) {
 }
     
 void
-xmldsig_transforms_free(xmldsig_transform *transforms, int with_node) {
+xmldsig_transforms_free(xmldsig_transform *transforms) {
     if (!transforms) return;
 
     if (transforms->next)
-	xmldsig_transforms_free(transforms->next, with_node);
+	xmldsig_transforms_free(transforms->next);
 
-    if (with_node) xmlFreeNode(transforms->node);
-
-    free(transforms->in_buf);
-    free(transforms->out_buf);
-    xmlXPathFreeNodeSet(transforms->in_nodes);
-    xmlXPathFreeNodeSet(transforms->out_nodes);
+    if (transforms->in_buf) free(transforms->in_buf);
+    if (transforms->out_buf) free(transforms->out_buf);
+    if (transforms->in_nodes) xmlXPathFreeNodeSet(transforms->in_nodes);
+    if (transforms->out_nodes) xmlXPathFreeNodeSet(transforms->out_nodes);
 
     free(transforms);
 }
-
-xmldsig_transform_result *
-xmldsig_transform_result_new(void) {
-    xmldsig_transform_result *result;
-
-    if (!(result = (xmldsig_transform_result *)malloc(sizeof(xmldsig_transform_result))))
-	return NULL;
-
-    result->bytes_len = 0;
-    result->bytes = NULL;
-    result->nodes = NULL;
-
-    return result;
-}
-
-void
-xmldsig_transform_result_free(xmldsig_transform_result *result) {
-    if (!result) return;
-
-    free(result->bytes);
-    xmlXPathFreeNodeSet(result->nodes);
-    free(result);
-}
-
 
 void
 Init_xmldsig(void)
