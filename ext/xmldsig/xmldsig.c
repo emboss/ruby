@@ -25,6 +25,9 @@ VALUE mSignatureAlgorithms;
 VALUE mTransformAlgorithms;
 VALUE mDigestAlgorithms;
 VALUE mHmacAlgorithms;
+VALUE mBase64;
+VALUE cDigest;
+VALUE mPKey;
 
 ID sRSA_SHA1, sRSA_SHA256, sRSA_SHA384, sRSA_SHA512;
 ID sDSA_SHA1, sDSA_SHA256;
@@ -69,6 +72,53 @@ xml_dsig_get_encoding(xmlDocPtr doc)
     if ((rb_enc = rb_enc_find(encoding)) == 0) 
 	rb_raise(eXMLDSIGError, "Could not load encoding %s", encoding);
     return rb_enc_from_encoding(rb_enc);
+}
+
+static const unsigned char *
+int_xmldsig_constant_str(VALUE module, ID constant, rb_encoding * doc_encoding)
+{
+    VALUE val;
+
+    val = rb_const_get(module, constant);
+    StringValue(val);
+    rb_enc_associate(val, doc_encoding);
+    return (const unsigned char *)StringValueCStr(val);
+}
+
+const unsigned char *
+xmldsig_digest_method_str(ID digest_method, rb_encoding * doc_encoding)
+{
+    return int_xmldsig_constant_str(mDigestAlgorithms, digest_method, doc_encoding);
+}
+
+const unsigned char *
+xmldsig_signature_method_str(ID signature_method, rb_encoding * doc_encoding)
+{
+    return int_xmldsig_constant_str(mSignatureAlgorithms, signature_method, doc_encoding);
+}
+
+const unsigned char *
+xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding * doc_encoding)
+{
+    return int_xmldsig_constant_str(mTransformAlgorithms, transform_algorithm, doc_encoding);
+}
+
+VALUE 
+xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc) 
+{
+    const char *algo;
+
+    algo = (const char *)xmlGetProp(digest_method_node, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA1, enc)) == 0)
+	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA1"));
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA256, enc)) == 0) 
+	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA256"));
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA384, enc)) == 0) 
+	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA384"));
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA512, enc)) == 0) 
+	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA512"));
+    else return Qnil;
 }
 
 xmldsig_sign_ctx *
@@ -183,6 +233,9 @@ Init_xmldsig(void)
     mTransformAlgorithms = rb_define_module_under(mXMLDSIG, "TransformAlgorithms");
     mDigestAlgorithms = rb_define_module_under(mXMLDSIG, "DigestAlgorithms");
     mHmacAlgorithms = rb_define_module_under(mXMLDSIG, "HmacAlgorithms");
+    mBase64 = rb_path2class("Base64");
+    cDigest = rb_path2class("OpenSSL::Digest");
+    mPKey = rb_path2class("OpenSSL::PKey");
 
     sRSA_SHA1 = rb_intern("RSA_SHA1");
     sRSA_SHA256 = rb_intern("RSA_SHA256");

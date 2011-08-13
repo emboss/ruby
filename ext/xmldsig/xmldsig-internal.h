@@ -18,6 +18,8 @@ extern "C" {
 
 #define CHAR2BYTES(s) (unsigned char *)(s)
 
+extern VALUE mBase64, cDigest, mPKey;
+
 extern ID sRSA_SHA1, sRSA_SHA256, sRSA_SHA384, sRSA_SHA512;
 extern ID sDSA_SHA1, sDSA_SHA256;
 extern ID sECDSA_SHA1, sECDSA_SHA256, sECDSA_SHA384, sECDSA_SHA512;
@@ -127,6 +129,14 @@ xmlNodeSetPtr xmldsig_node_set_intersect(xmlNodeSetPtr set1, xmlNodeSetPtr set2)
 xmlNodeSetPtr xmldsig_node_set_subtract(xmlNodeSetPtr set1, xmlNodeSetPtr set2);
 
 /* helper functions */
+const unsigned char * xmldsig_digest_method_str(ID digest_method, rb_encoding * doc_encoding);
+
+const unsigned char * xmldsig_signature_method_str(ID signature_method, rb_encoding * doc_encoding);
+
+const unsigned char * xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding * doc_encoding);
+
+VALUE xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc);
+
 const unsigned char* xmldsig_ns_href_get(const xmlNodePtr node);
 
 xmlNodePtr xmldsig_find_parent(xmlNodePtr node, const unsigned char *name, const unsigned char *ns);

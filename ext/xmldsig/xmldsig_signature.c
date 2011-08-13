@@ -48,7 +48,7 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
 {
     xmlNodePtr transform_node;
     xmldsig_transform *transform;
-    VALUE algorithm_id, algorithm;
+    VALUE algorithm_id;
 
     if (!(transform = xmldsig_transforms_new())) {
 	xmldsig_sign_ctx_free(ctx);
@@ -60,10 +60,7 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
 
     algorithm_id = rb_ivar_get(param_transform, sALGORITHM);
     transform->transformer = xmldsig_transformer_cb_for(algorithm_id);
-    algorithm = rb_const_get(mTransformAlgorithms, SYM2ID(algorithm_id));
-    StringValue(algorithm);
-    rb_enc_associate(algorithm, ctx->doc_encoding);
-    xmlNewProp(transform_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(algorithm)));
+    xmlNewProp(transform_node, A_ALGORITHM, xmldsig_transform_algorithm_str(SYM2ID(algorithm_id), ctx->doc_encoding));
 
     /* TODO: XPath */
 
@@ -82,7 +79,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
     xmlNodePtr ref_node, transforms_node, digest_method_node;
     xmldsig_reference *ref;
     rb_encoding *encoding;
-    VALUE id, uri, type, transforms, digest_method_id, digest_method;
+    VALUE id, uri, type, transforms, digest_method_id;
     long transform_len, i;
     xmldsig_transform *cur_transform = NULL, *prev_transform = NULL;
 
@@ -127,10 +124,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
 
     digest_method_node = xmlNewChild(ref_node, ctx->ns_dsig, N_DIGEST_METHOD, NULL);
     digest_method_id = rb_ivar_get(param_ref, sDIGEST_METHOD);
-    digest_method = rb_const_get(mDigestAlgorithms, SYM2ID(digest_method_id));
-    StringValue(digest_method);
-    rb_enc_associate(digest_method, encoding);
-    xmlNewProp(digest_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(digest_method)));
+    xmlNewProp(digest_method_node, A_ALGORITHM, xmldsig_digest_method_str(SYM2ID(digest_method_id), ctx->doc_encoding));
 
     xmlNewChild(ref_node, ctx->ns_dsig, N_DIGEST_VALUE, NULL);
 
@@ -141,28 +135,25 @@ static xmlNodePtr
 int_xmldsig_prepare_signature(xmldsig_sign_ctx *ctx, xmldsig_sign_params *params)
 {
     xmlNodePtr root, signature, signed_info, c14n_method_node, signature_method_node;
-    VALUE refs, c14n_method, signature_method;
+    VALUE refs;
     long ref_len, i;
     xmldsig_reference *cur_ref = NULL, *prev_ref = NULL;
 
     root = xmlDocGetRootElement(ctx->doc);
     
-    signature = xmlNewChild(root, ctx->ns_dsig, N_SIGNATURE, NULL);
+    signature = xmlNewChild(root, NULL, N_SIGNATURE, NULL);
     ctx->signature = signature;
-
+    ctx->ns_dsig = xmlNewNs(ctx->signature, NS_DSIG, NS_DSIG_PREFIX);
+    xmlSetNs(ctx->signature, ctx->ns_dsig); 
+    
     signed_info = xmlNewChild(signature, ctx->ns_dsig, N_SIGNED_INFO, NULL);
     ctx->signed_info = signed_info;
 
     c14n_method_node = xmlNewChild(signed_info, ctx->ns_dsig, N_C14N_METHOD, NULL);
     signature_method_node = xmlNewChild(signed_info, ctx->ns_dsig, N_SIGNATURE_METHOD, NULL);
 
-    c14n_method = rb_const_get(mTransformAlgorithms, SYM2ID(params->c14n_method));
-    StringValue(c14n_method);
-    xmlNewProp(c14n_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(c14n_method)));
-
-    signature_method = rb_const_get(mSignatureAlgorithms, SYM2ID(params->signature_method));
-    StringValue(signature_method);
-    xmlNewProp(signature_method_node, A_ALGORITHM, CHAR2BYTES(RSTRING_PTR(signature_method)));
+    xmlNewProp(c14n_method_node, A_ALGORITHM, xmldsig_transform_algorithm_str(SYM2ID(params->c14n_method), ctx->doc_encoding));
+    xmlNewProp(signature_method_node, A_ALGORITHM, xmldsig_signature_method_str(SYM2ID(params->signature_method), ctx->doc_encoding));
 
     refs = params->references;
     ref_len = RARRAY_LEN(refs);
@@ -219,6 +210,44 @@ int_xmldsig_compute_references(xmldsig_sign_ctx *ctx)
     }
 }
 
+static VALUE
+int_xmldsig_transform_result_bytes(xmldsig_reference *ref)
+{
+    xmldsig_transform *cur;
+
+    cur = ref->transforms;
+    
+    while (cur->next)
+	cur = cur->next;
+
+    return rb_str_new((const char *)cur->out_buf, cur->out_len);
+}
+
+static void
+int_xmldsig_finalize_references(xmldsig_sign_ctx *ctx)
+{
+    xmldsig_reference *cur_ref;
+    xmlNodePtr digest_method_node;
+    VALUE transform_result_bytes, digest, digest_result;
+    unsigned char* digest_value;
+    xmlNodePtr digest_value_node;
+
+    cur_ref = ctx->references;
+
+    while (cur_ref) {
+	transform_result_bytes = int_xmldsig_transform_result_bytes(cur_ref);
+	digest_method_node = xmldsig_find_child(cur_ref->node, N_DIGEST_METHOD, NS_DSIG);
+	digest = xmldsig_digest_for(digest_method_node, ctx->doc_encoding);
+	digest_result = rb_funcall(digest, rb_intern("digest"), 1, transform_result_bytes);
+	digest_result = rb_funcall(mBase64, rb_intern("encode64"), 1, digest_result);
+	digest_value = CHAR2BYTES(StringValueCStr(digest_result));
+	digest_value_node = xmldsig_find_child(cur_ref->node, N_DIGEST_VALUE, NS_DSIG);
+	xmlNodeAddContent(digest_value_node, digest_value);
+
+	cur_ref = cur_ref->next;
+    }
+}
+
 static void
 int_xmldsig_finalize_signature(xmldsig_sign_ctx *ctx)
 {
@@ -230,7 +259,6 @@ int_xmldsig_sign_ctx_init(xmldsig_sign_ctx *ctx, xmlDocPtr doc, rb_encoding *doc
 {
     ctx->doc = doc;
     ctx->doc_encoding = doc_encoding;
-    ctx->ns_dsig = xmlNewNs(xmlDocGetRootElement(ctx->doc), NS_DSIG, NS_DSIG_PREFIX);
 }
 
 VALUE
@@ -246,6 +274,7 @@ xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *doc_encoding, xmldsig_sign_params *
     int_xmldsig_prepare_signature(ctx, params);
     int_xmldsig_set_reference_input_nodes(ctx);
     int_xmldsig_compute_references(ctx);
+    int_xmldsig_finalize_references(ctx);
     int_xmldsig_finalize_signature(ctx);
 
     xmldsig_sign_ctx_free(ctx);

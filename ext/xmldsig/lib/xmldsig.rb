@@ -1,6 +1,5 @@
 require 'openssl'
+require 'base64'
 
 require 'xmldsig.so'
-
-require 'xmldsig/signature'
 

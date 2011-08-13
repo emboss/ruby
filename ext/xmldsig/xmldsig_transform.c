@@ -25,7 +25,7 @@ xmldsig_enveloped_signature_transform(xmldsig_transform *transform)
     
     signature_nodes = xmldsig_node_set_create(signature->doc, signature, 1);
     transform->out_nodes = xmldsig_node_set_subtract(transform->in_nodes, signature_nodes);
-    printf("in: %d; out: %d\n", xmlXPathNodeSetGetLength(transform->in_nodes), xmlXPathNodeSetGetLength(transform->out_nodes));
+
     if (!transform->out_nodes)
 	retval = 1;
     else
@@ -72,9 +72,6 @@ xmldsig_transforms_execute(xmldsig_transform *transforms)
 	}
 	else {
 	    if (!cur->out_buf) {
-		FILE *out;
-		out = fopen("c14n.txt", "w+");
-		printf("Nodes len: %d\n", xmlXPathNodeSetGetLength(cur->out_nodes));
 		/* need to apply a final default c14n 1.0 */
 		cur->out_len = xmlC14NDocDumpMemory(cur->node->doc, 
 					     cur->out_nodes, 
@@ -82,8 +79,6 @@ xmldsig_transforms_execute(xmldsig_transform *transforms)
 					     NULL, 
 					     0, 
 					     &(cur->out_buf));
-		fwrite(cur->out_buf, 1, cur->out_len, out);
-		fclose(out);
 	    }
 	}
 	cur = cur->next;
