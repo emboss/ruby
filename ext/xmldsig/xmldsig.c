@@ -46,7 +46,15 @@ ID sKEY, sCERT, sCA_CERTS, sSIGNATURE_METHOD,
    sDIGEST_METHOD, sC14N_METHOD, sREFERENCES,
    sTRANSFORMS, sALGORITHM, sSIGNATURE_VALUE,
    sKEY_VALUE, sDIGEST_VALUE, sID, sURI, sTYPE,
-   sENCODING;
+   sENCODING, sBYTES, sSIGNATURES;
+
+ID sivKEY, sivCERT, sivCA_CERTS, sivSIGNATURE_METHOD,
+   sivDIGEST_METHOD, sivC14N_METHOD, sivREFERENCES,
+   sivTRANSFORMS, sivALGORITHM, sivSIGNATURE_VALUE,
+   sivKEY_VALUE, sivDIGEST_VALUE, sivID, sivURI, sivTYPE,
+   sivENCODING, sivBYTES, sivSIGNATURES;
+
+ID sNEW, sSIGN;
 
 const unsigned char *NS_DSIG, *NS_DSIG11; 
 const unsigned char *NS_DSIG_PREFIX, *NS_DSIG11_PREFIX;
@@ -75,7 +83,7 @@ xml_dsig_get_encoding(xmlDocPtr doc)
 }
 
 static const unsigned char *
-int_xmldsig_constant_str(VALUE module, ID constant, rb_encoding * doc_encoding)
+int_xmldsig_constant_str(VALUE module, ID constant, rb_encoding *doc_encoding)
 {
     VALUE val;
 
@@ -86,21 +94,43 @@ int_xmldsig_constant_str(VALUE module, ID constant, rb_encoding * doc_encoding)
 }
 
 const unsigned char *
-xmldsig_digest_method_str(ID digest_method, rb_encoding * doc_encoding)
+xmldsig_digest_method_str(ID digest_method, rb_encoding *doc_encoding)
 {
     return int_xmldsig_constant_str(mDigestAlgorithms, digest_method, doc_encoding);
 }
 
 const unsigned char *
-xmldsig_signature_method_str(ID signature_method, rb_encoding * doc_encoding)
+xmldsig_signature_method_str(ID signature_method, rb_encoding *doc_encoding)
 {
     return int_xmldsig_constant_str(mSignatureAlgorithms, signature_method, doc_encoding);
 }
 
 const unsigned char *
-xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding * doc_encoding)
+xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding *doc_encoding)
 {
     return int_xmldsig_constant_str(mTransformAlgorithms, transform_algorithm, doc_encoding);
+}
+
+ID
+xmldsig_digest_method_id_for(xmlNodePtr digest_method, rb_encoding *enc)
+{
+    char *algo;
+    ID retval;
+
+    algo = (char *)xmlGetProp(digest_method, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA1, enc)) == 0)
+	retval = sSHA1;
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA256, enc)) == 0) 
+	retval = sSHA256;
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA384, enc)) == 0) 
+	retval = sSHA384;
+    else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA512, enc)) == 0) 
+	retval = sSHA512;
+    else retval = Qnil;
+
+    free(algo);
+    return retval;
 }
 
 VALUE 
@@ -119,6 +149,40 @@ xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc)
 	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA384"));
     else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA512, enc)) == 0) 
 	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA512"));
+    else retval = Qnil;
+
+    free(algo);
+    return retval;
+}
+
+ID
+xmldsig_signature_method_id_for(xmlNodePtr signature_method, rb_encoding *enc)
+{
+    char *algo;
+    ID retval;
+
+    algo = (char *)xmlGetProp(signature_method, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA1, enc)) == 0)
+	retval = sRSA_SHA1;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA1, enc)) == 0)
+	retval = sECDSA_SHA1;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA256, enc)) == 0)
+	retval = sRSA_SHA256;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA256, enc)) == 0)
+	retval = sECDSA_SHA256;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sDSA_SHA256, enc)) == 0)
+	retval = sDSA_SHA256;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA384, enc)) == 0)
+	retval = sRSA_SHA384;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA384, enc)) == 0)
+	retval = sECDSA_SHA384;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA512, enc)) == 0)
+	retval = sRSA_SHA512;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA512, enc)) == 0)
+	retval = sECDSA_SHA512;
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sDSA_SHA1, enc)) == 0)
+	retval = sDSA_SHA1;
     else retval = Qnil;
 
     free(algo);
@@ -153,6 +217,43 @@ xmldsig_digest_for_signature_method(xmlNodePtr signature_method_node, rb_encodin
     else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sDSA_SHA1, enc)) == 0) {
 	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("DSS1"));
     }
+    else retval = Qnil;
+
+    free(algo);
+    return retval;
+}
+
+
+ID
+xmldsig_transform_algorithm_id_for(xmlNodePtr node, rb_encoding *enc)
+{
+    char *algo;
+    ID retval;
+
+    algo = (char *)xmlGetProp(node, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_transform_algorithm_str(sC14N_10, enc)) == 0)
+	retval = sC14N_10;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_10_COMMENTS, enc)) == 0)
+	retval = sC14N_10_COMMENTS;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sEXC_C14N_10, enc)) == 0)
+	retval = sEXC_C14N_10;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sEXC_C14N_10_COMMENTS, enc)) == 0)
+	retval = sEXC_C14N_10_COMMENTS;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_11, enc)) == 0)
+	retval = sC14N_11;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_11_COMMENTS, enc)) == 0)
+	retval = sC14N_11_COMMENTS;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sBASE64, enc)) == 0)
+	retval = sBASE64;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sENVELOPED_SIGNATURE, enc)) == 0)
+	retval = sENVELOPED_SIGNATURE;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sXPATH, enc)) == 0)
+	retval = sXPATH;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sXPATH_FILTER2, enc)) == 0)
+	retval = sXPATH_FILTER2;
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sXSLT, enc)) == 0)
+	retval = sXSLT;
     else retval = Qnil;
 
     free(algo);
@@ -348,6 +449,29 @@ Init_xmldsig(void)
     sURI = rb_intern("uri");
     sTYPE = rb_intern("type");
     sENCODING = rb_intern("encoding");
+    sBYTES = rb_intern("bytes");
+    sSIGNATURES = rb_intern("signatures");
+
+    sNEW = rb_intern("new");
+
+    sivKEY = rb_intern("@key");
+    sivCERT = rb_intern("@cert");
+    sivCA_CERTS = rb_intern("@ca_certs");
+    sivSIGNATURE_METHOD = rb_intern("@signature_method");
+    sivC14N_METHOD = rb_intern("@c14n_method");
+    sivDIGEST_METHOD = rb_intern("@digest_method");
+    sivREFERENCES = rb_intern("@references");
+    sivTRANSFORMS = rb_intern("@transforms");
+    sivALGORITHM = rb_intern("@algorithm");
+    sivSIGNATURE_VALUE = rb_intern("@signature_value");
+    sivDIGEST_VALUE = rb_intern("@digest_value");
+    sivKEY_VALUE = rb_intern("@key_value");
+    sivID = rb_intern("@id");
+    sivURI = rb_intern("@uri");
+    sivTYPE = rb_intern("@type");
+    sivENCODING = rb_intern("@encoding");
+    sivBYTES = rb_intern("@bytes");
+    sivSIGNATURES = rb_intern("@signatures");
 
     NS_DSIG = CHAR2BYTES("http://www.w3.org/2000/09/xmldsig#");
     NS_DSIG11 = CHAR2BYTES("http://www.w3.org/2000/xmldsig11#");

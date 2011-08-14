@@ -1,4 +1,7 @@
 === 2011-08-14 [emboss]
+* Store signature object after signing.
+ 
+=== 2011-08-14 [emboss]
 * Implemented creation of a signature.
 
 === 2011-08-13 [emboss]

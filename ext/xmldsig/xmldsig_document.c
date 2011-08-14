@@ -67,7 +67,7 @@ xmldsig_doc_new(VALUE self, VALUE raw)
 
     WrapXmlDoc(cDocument, self, doc);
     encoding = xml_dsig_get_encoding(doc);
-    rb_ivar_set(self, sENCODING, encoding);
+    rb_ivar_set(self, sivENCODING, encoding);
     return self;
 }
 
@@ -85,7 +85,7 @@ xmldsig_doc_bytes(VALUE self)
     if (size <= 0)
        rb_raise(eXMLDSIGError, "Error when encoding the Document");	
     ret_val = rb_str_new2((char *)encoded);
-    rb_enc_associate(ret_val, rb_to_encoding(rb_ivar_get(self, sENCODING)));
+    rb_enc_associate(ret_val, rb_to_encoding(rb_ivar_get(self, sivENCODING)));
 
     return ret_val;
 }
@@ -102,11 +102,12 @@ xmldsig_doc_signatures(VALUE self)
 {
     VALUE signatures;
 
-    signatures = rb_iv_get(self, "signatures");
+    signatures = rb_ivar_get(self, sivSIGNATURES);
 
+    /* lazy initialization */
     if (NIL_P(signatures)) {
 	signatures = int_xmldsig_parse_signatures(self);
-	rb_iv_set(self, "signatures", signatures);
+	rb_ivar_set(self, sivSIGNATURES, signatures);
     }
 
     return signatures;
@@ -133,12 +134,12 @@ int_xmldsig_init_params(xmldsig_sign_params *sign_params, VALUE pkey, VALUE para
 	/* default is enveloped signature with SHA-256 */
 	ref_ary = rb_ary_new();
 	transforms_ary = rb_ary_new();
-	enveloped_sig = rb_funcall(cTransform, rb_intern("new"), 1, ID2SYM(sENVELOPED_SIGNATURE));
+	enveloped_sig = rb_funcall(cTransform, sNEW, 1, ID2SYM(sENVELOPED_SIGNATURE));
 	rb_ary_push(transforms_ary, enveloped_sig);
-	ref = rb_funcall(cReference, rb_intern("new"), 1, transforms_ary);
-	rb_ivar_set(ref, sURI, rb_str_new2(""));
-	rb_ivar_set(ref, sDIGEST_METHOD, ID2SYM(sSHA256));
-	rb_ivar_set(ref, sTRANSFORMS, transforms_ary);
+	ref = rb_funcall(cReference, sNEW, 1, transforms_ary);
+	rb_ivar_set(ref, sivURI, rb_str_new2(""));
+	rb_ivar_set(ref, sivDIGEST_METHOD, ID2SYM(sSHA256));
+	rb_ivar_set(ref, sivTRANSFORMS, transforms_ary);
 	rb_ary_push(ref_ary, ref);
 	sign_params->references = ref_ary;
     }
@@ -156,7 +157,7 @@ xmldsig_doc_sign(int argc, VALUE *argv, VALUE self)
 
     int_xmldsig_init_params(&sign_params, pkey, params);
     GetXmlDoc(self, doc);
-    encoding = rb_to_encoding(rb_ivar_get(self, sENCODING));
+    encoding = rb_to_encoding(rb_ivar_get(self, sivENCODING));
     signature = xmldsig_sig_sign(doc, encoding, &sign_params);
     signatures = xmldsig_doc_signatures(self);
     rb_ary_push(signatures, signature);

@@ -37,7 +37,16 @@ extern ID sKEY, sCERT, sCA_CERTS, sSIGNATURE_METHOD,
 	  sDIGEST_METHOD, sC14N_METHOD, sREFERENCES,
    	  sTRANSFORMS, sALGORITHM, sSIGNATURE_VALUE,
    	  sKEY_VALUE, sDIGEST_VALUE, sID, sURI, sTYPE,
-	  sENCODING;
+	  sENCODING, sBYTES, sSIGNATURES;
+
+
+extern ID sivKEY, sivCERT, sivCA_CERTS, sivSIGNATURE_METHOD,
+	  sivDIGEST_METHOD, sivC14N_METHOD, sivREFERENCES,
+   	  sivTRANSFORMS, sivALGORITHM, sivSIGNATURE_VALUE,
+   	  sivKEY_VALUE, sivDIGEST_VALUE, sivID, sivURI, sivTYPE,
+	  sivENCODING, sivBYTES, sivSIGNATURES;
+
+extern ID sNEW;
 
 /* Namespaces */
 extern const unsigned char *NS_DSIG, *NS_DSIG11; 
@@ -112,8 +121,6 @@ xmldsig_transform *xmldsig_transforms_new(void);
 void xmldsig_transforms_free(xmldsig_transform *transforms);
 
 /* public functions */
-VALUE xmldsig_signature_init(xmlNodePtr signature);
-
 VALUE xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *encoding, xmldsig_sign_params *params);
 
 int xmldsig_transforms_execute(xmldsig_transform *transforms);
@@ -134,6 +141,12 @@ const unsigned char * xmldsig_digest_method_str(ID digest_method, rb_encoding * 
 const unsigned char * xmldsig_signature_method_str(ID signature_method, rb_encoding * doc_encoding);
 
 const unsigned char * xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding * doc_encoding);
+
+ID xmldsig_digest_method_id_for(xmlNodePtr digest_method, rb_encoding *enc);
+
+ID xmldsig_signature_method_id_for(xmlNodePtr signature_method, rb_encoding *enc);
+
+ID xmldsig_transform_algorithm_id_for(xmlNodePtr node, rb_encoding *enc);
 
 VALUE xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc);
 

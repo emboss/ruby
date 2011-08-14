@@ -11,15 +11,90 @@
 #include "xmldsig.h"
 #include "xmldsig-internal.h"
 
+#define WrapXmlSig(klass, obj, s) do { \
+    if (!(s)) { \
+	rb_raise(rb_eRuntimeError, "xmlNodePtr was not initialized"); \
+    } \
+    (obj) = Data_Wrap_Struct((klass), 0, xmldsig_free_sig, (s)); \
+} while (0)
+#define GetXmlSig(obj, s) do { \
+    Data_Get_Struct((obj), xmlNodePtr, (s)); \
+    if (!(s)) { \
+	rb_raise(rb_eRuntimeError, "xmlNodePtr could not be initialized"); \
+    } \
+} while (0)
+#define SafeGetXmlSig(obj, s) do { \
+    XMLDSIG_Check_Kind((s), cSignature); \
+    GetXmlSig((obj), (s)); \
+} while (0)
+
 VALUE cSignature;
 VALUE cReference;
 VALUE cTransform;
 
-VALUE
-xmldsig_signature_init(xmlNodePtr signature)
+static void
+xmldsig_free_sig(xmlNodePtr sig)
 {
-    /* TODO */
-    return Qnil;
+    /* do nothing, node will be freed with the document */
+}
+
+static void
+int_xmldsig_set_signature_method(VALUE signature, xmlNodePtr signature_node, rb_encoding *enc)
+{
+    xmlNodePtr signature_method;
+    ID id;
+
+    signature_method = xmldsig_find_child(signature_node, N_SIGNATURE_METHOD, NS_DSIG);
+    id = xmldsig_signature_method_id_for(signature_method, enc);
+    if (id == Qnil)
+	rb_raise(eXMLDSIGError, "Unknown signature method");
+    rb_ivar_set(signature, sivSIGNATURE_METHOD, ID2SYM(id));
+} 
+
+static void
+int_xmldsig_set_c14n_method(VALUE signature, xmlNodePtr signature_node, rb_encoding *enc)
+{
+    xmlNodePtr c14n_method;
+    ID id;
+
+    c14n_method = xmldsig_find_child(signature_node, N_C14N_METHOD, NS_DSIG);
+    id = xmldsig_transform_algorithm_id_for(c14n_method, enc);
+    if (id == Qnil)
+	rb_raise(eXMLDSIGError, "Unknown canonicalization method");
+    rb_ivar_set(signature, sivC14N_METHOD, ID2SYM(id));
+}
+
+static void
+int_xmldsig_set_signature_value(VALUE signature, xmlNodePtr signature_node)
+{
+    xmlNodePtr signature_value_node;
+    unsigned char *tmp;
+    VALUE signature_value;
+
+    signature_value_node = xmldsig_find_child(signature_node, N_SIGNATURE_VALUE, NS_DSIG);
+    tmp = xmlNodeGetContent(signature_value_node);
+    signature_value = rb_str_new2((const char*)tmp);
+    signature_value = rb_funcall(mBase64, rb_intern("decode64"), 1, signature_value);
+    rb_ivar_set(signature, sivSIGNATURE_VALUE, signature_value);
+
+    free(tmp);
+}
+
+static VALUE
+xmldsig_signature_parse(xmlNodePtr signature, rb_encoding *enc)
+{
+    VALUE obj;
+    
+    if (!signature)
+	rb_raise(rb_eArgError, "Signature is NULL");
+
+    WrapXmlSig(cSignature, obj, signature);
+
+    int_xmldsig_set_signature_method(obj, signature, enc);
+    int_xmldsig_set_c14n_method(obj, signature, enc);
+    int_xmldsig_set_signature_value(obj, signature);
+
+    return obj;
 }
 
 static VALUE
@@ -29,7 +104,7 @@ xmldsig_reference_init(int argc, VALUE *argv, VALUE self)
     rb_scan_args(argc, argv, "11", &transforms, &opt_hash);
     if (NIL_P(transforms)) 
 	rb_raise(rb_eArgError, "Transforms may not be nil");
-    rb_ivar_set(self, sTRANSFORMS, transforms);
+    rb_ivar_set(self, sivTRANSFORMS, transforms);
 
     /* TODO: opt_hash(id, type, uri) */
 
@@ -39,7 +114,7 @@ xmldsig_reference_init(int argc, VALUE *argv, VALUE self)
 static VALUE
 xmldsig_transform_init(VALUE self, VALUE algorithm)
 {
-    rb_ivar_set(self, sALGORITHM, algorithm);
+    rb_ivar_set(self, sivALGORITHM, algorithm);
     return self;
 }
 
@@ -58,7 +133,7 @@ int_xmldsig_create_transform(xmldsig_sign_ctx *ctx, VALUE param_transform, xmlNo
     transform_node = xmlNewChild(transforms_node, ctx->ns_dsig, N_TRANSFORM, NULL);
     transform->node = transform_node;
 
-    algorithm_id = rb_ivar_get(param_transform, sALGORITHM);
+    algorithm_id = rb_ivar_get(param_transform, sivALGORITHM);
     transform->transformer = xmldsig_transformer_cb_for(algorithm_id);
     xmlNewProp(transform_node, A_ALGORITHM, xmldsig_transform_algorithm_str(SYM2ID(algorithm_id), ctx->doc_encoding));
 
@@ -90,9 +165,9 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
 
     encoding = ctx->doc_encoding;
 
-    id = rb_ivar_get(param_ref, sID);
-    uri = rb_ivar_get(param_ref, sURI);
-    type = rb_ivar_get(param_ref, sTYPE);
+    id = rb_ivar_get(param_ref, sivID);
+    uri = rb_ivar_get(param_ref, sivURI);
+    type = rb_ivar_get(param_ref, sivTYPE);
 
     ref_node = xmlNewChild(ctx->signed_info, ctx->ns_dsig, N_REFERENCE, NULL);
     ref->node = ref_node;
@@ -103,7 +178,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
 
     transforms_node = xmlNewChild(ref_node, ctx->ns_dsig, N_TRANSFORMS, NULL);
 
-    transforms = rb_ivar_get(param_ref, sTRANSFORMS);
+    transforms = rb_ivar_get(param_ref, sivTRANSFORMS);
     transform_len = RARRAY_LEN(transforms);
 
     for (i=0; i < transform_len; i++) {
@@ -123,7 +198,7 @@ int_xmldsig_create_reference(xmldsig_sign_ctx *ctx, VALUE param_ref)
     }
 
     digest_method_node = xmlNewChild(ref_node, ctx->ns_dsig, N_DIGEST_METHOD, NULL);
-    digest_method_id = rb_ivar_get(param_ref, sDIGEST_METHOD);
+    digest_method_id = rb_ivar_get(param_ref, sivDIGEST_METHOD);
     xmlNewProp(digest_method_node, A_ALGORITHM, xmldsig_digest_method_str(SYM2ID(digest_method_id), ctx->doc_encoding));
 
     xmlNewChild(ref_node, ctx->ns_dsig, N_DIGEST_VALUE, NULL);
@@ -289,7 +364,6 @@ VALUE
 xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *doc_encoding, xmldsig_sign_params *params)
 {
     xmldsig_sign_ctx *ctx;
-    VALUE signature;
 
     if (!(ctx = xmldsig_sign_ctx_new()))
 	rb_raise(rb_eRuntimeError, NULL);
@@ -302,8 +376,7 @@ xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *doc_encoding, xmldsig_sign_params *
     int_xmldsig_finalize_signature(ctx, params->key);
 
     xmldsig_sign_ctx_free(ctx);
-    signature = xmldsig_signature_init(ctx->signature);
-    return signature;
+    return xmldsig_signature_parse(ctx->signature, doc_encoding);
 }
 
 void
