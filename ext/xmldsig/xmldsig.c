@@ -106,19 +106,101 @@ xmldsig_transform_algorithm_str(ID transform_algorithm, rb_encoding * doc_encodi
 VALUE 
 xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc) 
 {
-    const char *algo;
+    char *algo;
+    VALUE retval;
 
-    algo = (const char *)xmlGetProp(digest_method_node, A_ALGORITHM);
+    algo = (char *)xmlGetProp(digest_method_node, A_ALGORITHM);
 
     if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA1, enc)) == 0)
-	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA1"));
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA1"));
     else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA256, enc)) == 0) 
-	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA256"));
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA256"));
     else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA384, enc)) == 0) 
-	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA384"));
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA384"));
     else if (strcmp(algo, (const char*)xmldsig_digest_method_str(sSHA512, enc)) == 0) 
-	return rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA512"));
-    else return Qnil;
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA512"));
+    else retval = Qnil;
+
+    free(algo);
+    return retval;
+}
+
+VALUE
+xmldsig_digest_for_signature_method(xmlNodePtr signature_method_node, rb_encoding *enc)
+{
+    char *algo;
+    VALUE retval;
+
+    algo = (char *)xmlGetProp(signature_method_node, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA1, enc)) == 0 ||
+	strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA1, enc)) == 0) {
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA1"));
+    }
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA256, enc)) == 0 ||
+	strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA256, enc)) == 0 ||
+	strcmp(algo, (const char*)xmldsig_signature_method_str(sDSA_SHA256, enc)) == 0) {
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA256"));
+    }
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA384, enc)) == 0 ||
+	strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA384, enc)) == 0) {
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA384"));
+    }
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sRSA_SHA512, enc)) == 0 ||
+	strcmp(algo, (const char*)xmldsig_signature_method_str(sECDSA_SHA512, enc)) == 0) {
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("SHA512"));
+    }
+    else if (strcmp(algo, (const char*)xmldsig_signature_method_str(sDSA_SHA1, enc)) == 0) {
+	retval = rb_funcall(cDigest, rb_intern("new"), 1, rb_str_new2("DSS1"));
+    }
+    else retval = Qnil;
+
+    free(algo);
+    return retval;
+}
+
+int
+xmldsig_c14n_method_for(xmlNodePtr transform_node, rb_encoding *enc, int *mode, int *with_comments)
+{
+    char *algo;
+    int retval;
+
+    algo = (char *)xmlGetProp(transform_node, A_ALGORITHM);
+
+    if (strcmp(algo, (const char*)xmldsig_transform_algorithm_str(sC14N_10, enc)) == 0) {
+	*mode = XML_C14N_1_0;
+	*with_comments = 0;
+	retval = 1;
+    }
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_10_COMMENTS, enc)) == 0) {
+	*mode = XML_C14N_1_0;
+	*with_comments = 1;
+	retval = 1;
+    }
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sEXC_C14N_10, enc)) == 0) {
+	*mode = XML_C14N_EXCLUSIVE_1_0;
+	*with_comments = 0;
+	retval = 1;
+    }
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sEXC_C14N_10_COMMENTS, enc)) == 0) {
+	*mode = XML_C14N_EXCLUSIVE_1_0;
+	*with_comments = 1;
+	retval = 1;
+    }
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_11, enc)) == 0) {
+	*mode = XML_C14N_1_1;
+	*with_comments = 0;
+	retval = 1;
+    }
+    else if (strcmp(algo, (const char *)xmldsig_transform_algorithm_str(sC14N_11_COMMENTS, enc)) == 0) {
+	*mode = XML_C14N_1_1;
+	*with_comments = 1;
+	retval = 1;
+    }
+    else retval = 0;
+
+    free(algo);
+    return retval;
 }
 
 xmldsig_sign_ctx *
@@ -128,12 +210,7 @@ xmldsig_sign_ctx_new(void) {
     if (!(ctx = (xmldsig_sign_ctx *)malloc(sizeof(xmldsig_sign_ctx))))
 	return NULL;
 
-    ctx->doc = NULL;
-    ctx->doc_encoding = NULL;
-    ctx->ns_dsig = NULL;
-    ctx->signature = NULL;
-    ctx->signed_info = NULL;
-    ctx->references =NULL;
+    memset(ctx, 0, sizeof(xmldsig_sign_ctx));
 
     return ctx;
 }
@@ -154,10 +231,7 @@ xmldsig_reference_new(void) {
     if (!(ref = (xmldsig_reference *)malloc(sizeof(xmldsig_reference))))
 	return NULL;
 
-    ref->node = NULL;
-    ref->transforms = NULL;
-    ref->prev = NULL;
-    ref->next = NULL;
+    memset(ref, 0, sizeof(xmldsig_reference));
 
     return ref;
 }
@@ -181,17 +255,8 @@ xmldsig_transforms_new(void) {
     if (!(transform = (xmldsig_transform *)malloc(sizeof(xmldsig_transform))))
 	return NULL;
 
-    transform->node = NULL;
-    transform->in_buf = NULL;
-    transform->in_len = 0;
-    transform->out_buf = NULL;
-    transform->out_len = 0;
-    transform->in_nodes = NULL;
-    transform->out_nodes = NULL;
-    transform->prev = NULL;
-    transform->next = NULL;
-    transform->transformer = NULL;
-
+    memset(transform, 0, sizeof(xmldsig_transform));
+    
     return transform;
 }
     

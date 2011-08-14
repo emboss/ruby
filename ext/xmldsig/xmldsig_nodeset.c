@@ -61,6 +61,25 @@ xmldsig_find_child(xmlNodePtr node, const unsigned char *name, const unsigned ch
     return NULL;
 }
 
+void
+xmldsig_add_parent_namespaces(xmlNodePtr node, xmlNodeSetPtr nodes)
+{
+    xmlNodePtr cur;
+    xmlNsPtr ns;
+
+    cur = node;
+
+    while (cur && cur->type == XML_ELEMENT_NODE) {
+	ns = cur->nsDef;
+	while (ns) {
+	    /* act like node is the "hosting" node for the namespace */
+	    xmlXPathNodeSetAddNs(nodes, node, ns);
+	    ns = ns->next;
+	}
+	cur = cur->parent;
+    }
+}
+
 /* Document order is element, namespaces, attributes, then children */
 static void
 int_xmldsig_nodeset_tree_recursive(xmlNodePtr cur, xmlNodePtr parent, xmlNodeSetPtr set, int with_comments)

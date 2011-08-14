@@ -137,6 +137,17 @@ const unsigned char * xmldsig_transform_algorithm_str(ID transform_algorithm, rb
 
 VALUE xmldsig_digest_for(xmlNodePtr digest_method_node, rb_encoding *enc);
 
+VALUE xmldsig_digest_for_signature_method(xmlNodePtr signature_method_node, rb_encoding *enc);
+
+/**
+ * returns 1 on success, 0 on failure.
+ */
+int xmldsig_c14n_method_for(xmlNodePtr transform_node, rb_encoding *doc_encoding, int *mode, int *with_comments);
+
+int xmldsig_canonicalize_signed_info(xmlNodePtr signed_info, rb_encoding *doc_encoding, unsigned char **out_buf);
+
+void xmldsig_add_parent_namespaces(xmlNodePtr signed_info, xmlNodeSetPtr nodes);
+
 const unsigned char* xmldsig_ns_href_get(const xmlNodePtr node);
 
 xmlNodePtr xmldsig_find_parent(xmlNodePtr node, const unsigned char *name, const unsigned char *ns);

@@ -75,7 +75,7 @@ xmldsig_transforms_execute(xmldsig_transform *transforms)
 		/* need to apply a final default c14n 1.0 */
 		cur->out_len = xmlC14NDocDumpMemory(cur->node->doc, 
 					     cur->out_nodes, 
-					     0, 
+					     XML_C14N_1_0, 
 					     NULL, 
 					     0, 
 					     &(cur->out_buf));
@@ -91,15 +91,44 @@ xmlNodeSetPtr
 xmldsig_input_nodes_for_ref(xmlNodePtr ref_node)
 {
     unsigned char *uri;
+    xmlNodeSetPtr retval;
 
     uri = xmlGetProp(ref_node, A_URI);
 
     if (strcmp((const char *)uri, "") == 0) {
-	return xmldsig_node_set_create(ref_node->doc, NULL, 1);
+	retval = xmldsig_node_set_create(ref_node->doc, NULL, 1);
     }
     else {
+	free(uri);
 	rb_raise(rb_eRuntimeError, "Currently only \"\" URI values are supported.");
 	return NULL;
     }
+
+    free(uri);
+    return retval;
+}
+
+int
+xmldsig_canonicalize_signed_info(xmlNodePtr signed_info, rb_encoding *doc_encoding, unsigned char **out_buf)
+{
+    xmlNodePtr c14n_method_node;
+    xmlNodeSetPtr nodes;
+    int mode, with_comments, len;
+
+    c14n_method_node = xmldsig_find_child(signed_info, N_C14N_METHOD, NS_DSIG);
+    if (!xmldsig_c14n_method_for(c14n_method_node, doc_encoding, &mode, &with_comments))
+	return 0;
+
+    nodes = xmldsig_node_set_create(signed_info->doc, signed_info, with_comments);
+    xmldsig_add_parent_namespaces(signed_info, nodes);
+
+    len = xmlC14NDocDumpMemory(signed_info->doc,
+	    			nodes,
+				mode,
+				NULL,
+				with_comments,
+				out_buf);
+    xmlXPathFreeNodeSet(nodes);
+    return len;
 }
 

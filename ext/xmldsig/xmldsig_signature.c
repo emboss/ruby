@@ -228,8 +228,7 @@ int_xmldsig_finalize_references(xmldsig_sign_ctx *ctx)
 {
     xmldsig_reference *cur_ref;
     xmlNodePtr digest_method_node;
-    VALUE transform_result_bytes, digest, digest_result;
-    unsigned char* digest_value;
+    VALUE transform_result_bytes, digest, digest_value;
     xmlNodePtr digest_value_node;
 
     cur_ref = ctx->references;
@@ -238,20 +237,45 @@ int_xmldsig_finalize_references(xmldsig_sign_ctx *ctx)
 	transform_result_bytes = int_xmldsig_transform_result_bytes(cur_ref);
 	digest_method_node = xmldsig_find_child(cur_ref->node, N_DIGEST_METHOD, NS_DSIG);
 	digest = xmldsig_digest_for(digest_method_node, ctx->doc_encoding);
-	digest_result = rb_funcall(digest, rb_intern("digest"), 1, transform_result_bytes);
-	digest_result = rb_funcall(mBase64, rb_intern("encode64"), 1, digest_result);
-	digest_value = CHAR2BYTES(StringValueCStr(digest_result));
+	if (NIL_P(digest)) {
+	    xmldsig_sign_ctx_free(ctx);
+	    rb_raise(eXMLDSIGError, "Unknown digest: %s", xmlGetProp(digest_method_node, A_ALGORITHM));
+	}
+	digest_value = rb_funcall(digest, rb_intern("digest"), 1, transform_result_bytes);
+	digest_value = rb_funcall(mBase64, rb_intern("encode64"), 1, digest_value);
 	digest_value_node = xmldsig_find_child(cur_ref->node, N_DIGEST_VALUE, NS_DSIG);
-	xmlNodeAddContent(digest_value_node, digest_value);
+	xmlNodeAddContent(digest_value_node, CHAR2BYTES(StringValueCStr(digest_value)));
 
 	cur_ref = cur_ref->next;
     }
 }
 
 static void
-int_xmldsig_finalize_signature(xmldsig_sign_ctx *ctx)
+int_xmldsig_finalize_signature(xmldsig_sign_ctx *ctx, VALUE key)
 {
-    /* TODO */
+    unsigned char *canonical_bytes;
+    int len_bytes;
+    xmlNodePtr signed_info_node, signature_method_node, signature_value_node;
+    VALUE digest, sig_value;
+
+    signed_info_node = xmldsig_find_child(ctx->signature, N_SIGNED_INFO, NS_DSIG);
+    len_bytes = xmldsig_canonicalize_signed_info(signed_info_node, ctx->doc_encoding, &canonical_bytes);
+
+    if (len_bytes < 0) {
+	xmldsig_sign_ctx_free(ctx);
+	rb_raise(eXMLDSIGError, "Error when canonicalizing the SignedInfo");
+    }
+    signature_method_node = xmldsig_find_child(signed_info_node, N_SIGNATURE_METHOD, NS_DSIG);
+    digest = xmldsig_digest_for_signature_method(signature_method_node, ctx->doc_encoding);
+    if (!digest) {
+	xmldsig_sign_ctx_free(ctx);
+	rb_raise(eXMLDSIGError, "Unknown signature method: %s", xmlGetProp(signature_method_node, A_ALGORITHM));
+    }
+
+    sig_value = rb_funcall(key, rb_intern("sign"), 2, digest, rb_str_new((const char*)canonical_bytes, len_bytes));
+    sig_value = rb_funcall(mBase64, rb_intern("encode64"), 1, sig_value);
+    signature_value_node = xmldsig_find_child(ctx->signature, N_SIGNATURE_VALUE, NS_DSIG);
+    xmlNodeAddContent(signature_value_node, CHAR2BYTES(StringValueCStr(sig_value)));
 }
 
 static void
@@ -275,7 +299,7 @@ xmldsig_sig_sign(xmlDocPtr doc, rb_encoding *doc_encoding, xmldsig_sign_params *
     int_xmldsig_set_reference_input_nodes(ctx);
     int_xmldsig_compute_references(ctx);
     int_xmldsig_finalize_references(ctx);
-    int_xmldsig_finalize_signature(ctx);
+    int_xmldsig_finalize_signature(ctx, params->key);
 
     xmldsig_sign_ctx_free(ctx);
     signature = xmldsig_signature_init(ctx->signature);
