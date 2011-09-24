@@ -916,11 +916,12 @@ ossl_asn1_decode0(unsigned char **pp, long length, long *offset, int depth,
 {
     unsigned char *start, *p;
     const unsigned char *p0;
-    long len = 0, inner_read = 0, off = *offset;
+    long len = 0, inner_read = 0, off;
     int hlen, tag, tc, j;
     VALUE asn1data, tag_class;
 
     p = *pp;
+    off = offset ? *offset : 0;
     start = p;
     p0 = p;
     j = ASN1_get_object(&p0, &len, &tag, &tc, length);
@@ -969,7 +970,9 @@ ossl_asn1_decode0(unsigned char **pp, long length, long *offset, int depth,
 		   inner_read, hlen + len);
     }
 
-    *offset = off;
+    if (offset)
+	*offset = off;
+
     return asn1data;
 }
 
